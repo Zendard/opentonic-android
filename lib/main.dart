@@ -51,6 +51,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late Future<List<OpenTonicList>> futureLists;
   late SharedPreferences prefs;
+  final addListNameController = TextEditingController();
   late bool loaded = false;
 
   @override
@@ -65,6 +66,49 @@ class _HomePageState extends State<HomePage> {
       prefs = prefsLocal;
       loaded = true;
     });
+  }
+
+  Future<List<OpenTonicList>> fetchLists() async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverUrl = prefs.getString("server-url");
+    final username = prefs.getString("username");
+    final password = prefs.getString("password");
+    final authToken = base64Encode(utf8.encode("$username:$password"));
+    final response = await http.get(
+      Uri.parse("$serverUrl/api/lists"),
+      headers: {HttpHeaders.authorizationHeader: "Basic $authToken"},
+    );
+
+    if (response.statusCode == 200) {
+      var strList = List.from(jsonDecode(response.body));
+      return strList.map((str) => OpenTonicList.fromJson(str)).toList();
+    } else {
+      throw Exception("Failed to fetch lists");
+    }
+  }
+
+  Future<int> addList(String listName) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverUrl = prefs.getString("server-url");
+    final username = prefs.getString("username");
+    final password = prefs.getString("password");
+    final authToken = base64Encode(utf8.encode("$username:$password"));
+
+    final response = await http.post(
+      Uri.parse("$serverUrl/api/create-list"),
+      headers: {
+        HttpHeaders.authorizationHeader: "Basic $authToken",
+        HttpHeaders.contentTypeHeader: "application/json",
+      },
+      body: jsonEncode({"name": listName}),
+    );
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      return body["id"];
+    } else {
+      throw Exception("Failed to add list: ${response.body}");
+    }
   }
 
   @override
@@ -99,11 +143,72 @@ class _HomePageState extends State<HomePage> {
             }).toList();
             return ListView(children: listItems);
           } else if (snapshot.hasError) {
-            return Text("${snapshot.error}");
+            return Center(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error, size: 32),
+                  Text(
+                    "An error has occurred:",
+                    style: TextStyle(fontSize: 32),
+                  ),
+                  Container(
+                    padding: EdgeInsetsGeometry.all(32),
+                    child: Text("${snapshot.error}"),
+                  ),
+                ],
+              ),
+            );
           }
 
-          return const CircularProgressIndicator();
+          return const Center(child: CircularProgressIndicator());
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () => showDialog(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: Text("Add list"),
+            contentPadding: EdgeInsetsGeometry.all(16),
+            children: [
+              TextField(
+                controller: addListNameController,
+                decoration: InputDecoration(
+                  labelText: "List name",
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.text,
+                onSubmitted: (value) {
+                  addList(value);
+                },
+              ),
+              TextButton(
+                onPressed: () {
+                  addList(addListNameController.text)
+                      .onError((error) {
+                        if (!context.mounted) return 0;
+                        Navigator.pop(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger.showSnackBar(
+                          SnackBar(content: Text("Error:$error")),
+                        );
+                        return 0;
+                      })
+                      .then((_) {
+                        if (!context.mounted) return 0;
+                        Navigator.pop(context);
+                        setState(() {
+                          futureLists = fetchLists();
+                        });
+                      });
+                },
+                child: Text("Add list"),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -217,22 +322,44 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-Future<List<OpenTonicList>> fetchLists() async {
-  final prefs = await SharedPreferences.getInstance();
-  final serverUrl = prefs.getString("server-url");
-  final username = prefs.getString("username");
-  final password = prefs.getString("password");
-  final authToken = base64Encode(utf8.encode("$username:$password"));
-  final response = await http.get(
-    Uri.parse("$serverUrl/api/lists"),
-    headers: {HttpHeaders.authorizationHeader: "Basic $authToken"},
-  );
+class AddListPage extends StatefulWidget {
+  const AddListPage({super.key});
 
-  if (response.statusCode == 200) {
-    var strList = List.from(jsonDecode(response.body));
-    return strList.map((str) => OpenTonicList.fromJson(str)).toList();
-  } else {
-    throw Exception("Failed to fetch lists");
+  @override
+  State<AddListPage> createState() => _AddListPageState();
+}
+
+class _AddListPageState extends State<AddListPage> {
+  late bool loaded = false;
+  late SharedPreferences prefs;
+
+  @override
+  void initState() {
+    super.initState();
+    loadPrefs();
+  }
+
+  Future<void> loadPrefs() async {
+    final prefsLocal = await SharedPreferences.getInstance();
+    setState(() {
+      prefs = prefsLocal;
+      loaded = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!loaded) {
+      return Scaffold(
+        appBar: AppBar(title: Text("Add List")),
+        body: CircularProgressIndicator(),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text("Add List")),
+      body: TextField(),
+    );
   }
 }
 
