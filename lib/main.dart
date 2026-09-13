@@ -60,14 +60,6 @@ class _HomePageState extends State<HomePage> {
     futureLists = fetchLists();
   }
 
-  Future<void> loadPrefs() async {
-    final prefsLocal = await SharedPreferences.getInstance();
-    setState(() {
-      prefs = prefsLocal;
-      loaded = true;
-    });
-  }
-
   Future<List<OpenTonicList>> fetchLists() async {
     final prefs = await SharedPreferences.getInstance();
     final serverUrl = prefs.getString("server-url");
@@ -138,6 +130,14 @@ class _HomePageState extends State<HomePage> {
                   title: Text(list.name),
                   subtitle: Text(list.owner),
                   leading: Icon(Icons.storefront),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ListPage(listId: list.id),
+                      ),
+                    );
+                  },
                 ),
               );
             }).toList();
@@ -187,7 +187,7 @@ class _HomePageState extends State<HomePage> {
               TextButton(
                 onPressed: () {
                   addList(addListNameController.text)
-                      .onError((error) {
+                      .catchError((error) {
                         if (!context.mounted) return 0;
                         Navigator.pop(context);
                         final messenger = ScaffoldMessenger.of(context);
@@ -211,6 +211,26 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+}
+
+class OpenTonicList {
+  final int id;
+  final String name;
+  final String owner;
+
+  const OpenTonicList({
+    required this.id,
+    required this.name,
+    required this.owner,
+  });
+
+  factory OpenTonicList.fromJson(Map<String, dynamic> json) {
+    return switch (json) {
+      {"id": int id, "name": String name, "owner": String owner} =>
+        OpenTonicList(id: id, name: name, owner: owner),
+      _ => throw const FormatException('Failed to load album.'),
+    };
   }
 }
 
@@ -363,22 +383,167 @@ class _AddListPageState extends State<AddListPage> {
   }
 }
 
-class OpenTonicList {
-  final int id;
+class ListPage extends StatefulWidget {
+  final int listId;
+  const ListPage({super.key, required this.listId});
+
+  @override
+  State<ListPage> createState() => _ListPageState();
+}
+
+class _ListPageState extends State<ListPage> {
+  late SharedPreferences prefs;
+
+  Future<void> loadPrefs() async {
+    final prefsLocal = await SharedPreferences.getInstance();
+    setState(() {
+      prefs = prefsLocal;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadPrefs();
+  }
+
+  Future<OpenTonicListFull> fetchList(int listId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverUrl = prefs.getString("server-url");
+    final username = prefs.getString("username");
+    final password = prefs.getString("password");
+    final authToken = base64Encode(utf8.encode("$username:$password"));
+    final response = await http.get(
+      Uri.parse("$serverUrl/api/list/$listId"),
+      headers: {HttpHeaders.authorizationHeader: "Basic $authToken"},
+    );
+
+    if (response.statusCode == 200) {
+      return OpenTonicListFull.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception("Failed to fetch list: $response");
+    }
+  }
+
+  IconData categoryToIcon(String? category) {
+    return switch (category) {
+      "Fruit & Vegetables" => Icons.apple,
+      "Meat" => Icons.outdoor_grill,
+      "Vegetarian" => Icons.category,
+      "Baking" => Icons.cake,
+      _ => Icons.category,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: fetchList(widget.listId),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return Scaffold(
+            appBar: AppBar(title: Text(snapshot.data!.name)),
+            body: ListView(
+              children: snapshot.data!.listItems
+                  .map(
+                    (listItem) => ListTile(
+                      title: Text(listItem.name),
+                      leading: Checkbox(
+                        value: listItem.checked,
+                        onChanged: (value) {},
+                      ),
+                      dense: true,
+                      trailing: Icon(categoryToIcon(listItem.category)),
+                    ),
+                  )
+                  .toList(),
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text("Error while loading list")),
+            body: Text(snapshot.error.toString()),
+          );
+        }
+        return Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+}
+
+class OpenTonicListFull {
   final String name;
   final String owner;
+  final List<String> users;
+  final List<OpenTonicListItem> listItems;
 
-  const OpenTonicList({
-    required this.id,
+  const OpenTonicListFull({
     required this.name,
     required this.owner,
+    required this.users,
+    required this.listItems,
   });
 
-  factory OpenTonicList.fromJson(Map<String, dynamic> json) {
+  factory OpenTonicListFull.fromJson(Map<String, dynamic> json) {
+    final jsonStr = json.toString();
     return switch (json) {
-      {"id": int id, "name": String name, "owner": String owner} =>
-        OpenTonicList(id: id, name: name, owner: owner),
-      _ => throw const FormatException('Failed to load album.'),
+      {
+        "name": String name,
+        "owner": String owner,
+        "users": List<dynamic> users,
+        "list_items": List<dynamic> listItems,
+      } =>
+        OpenTonicListFull(
+          name: name,
+          owner: owner,
+          users: users.map((user) => user.toString()).toList(),
+          listItems: listItems
+              .map((listItem) => OpenTonicListItem.fromJson(listItem))
+              .toList(),
+        ),
+      _ => throw FormatException('Failed to fetch list: $jsonStr'),
+    };
+  }
+}
+
+class OpenTonicListItem {
+  final int id;
+  final String name;
+  final bool checked;
+  final String? category;
+  final String addedBy;
+  final DateTime addedOn;
+
+  const OpenTonicListItem({
+    required this.id,
+    required this.name,
+    required this.checked,
+    required this.category,
+    required this.addedBy,
+    required this.addedOn,
+  });
+
+  factory OpenTonicListItem.fromJson(Map<String, dynamic> json) {
+    return switch (json) {
+      {
+        "id": int id,
+        "name": String name,
+        "checked": bool checked,
+        "category": String? category,
+        "added_by": String addedBy,
+        "added_on": String addedOn,
+      } =>
+        OpenTonicListItem(
+          id: id,
+          name: name,
+          checked: checked,
+          category: category,
+          addedBy: addedBy,
+          addedOn: DateTime.parse(addedOn),
+        ),
+      _ => throw FormatException(
+        'Failed to parse ListItem: ${json.toString()}',
+      ),
     };
   }
 }
