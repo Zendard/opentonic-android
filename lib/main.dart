@@ -393,6 +393,9 @@ class ListPage extends StatefulWidget {
 
 class _ListPageState extends State<ListPage> {
   late SharedPreferences prefs;
+  late OpenTonicListFull list;
+  late bool loaded = false;
+  late List<int> listItemStates;
 
   Future<void> loadPrefs() async {
     final prefsLocal = await SharedPreferences.getInstance();
@@ -405,6 +408,18 @@ class _ListPageState extends State<ListPage> {
   void initState() {
     super.initState();
     loadPrefs();
+    setList(widget.listId);
+  }
+
+  void setList(int listId) async {
+    final listLocal = await fetchList(listId);
+    setState(() {
+      list = listLocal;
+      listItemStates = listLocal.listItems
+          .map((listItem) => listItem.checked ? 1 : 0)
+          .toList();
+      loaded = true;
+    });
   }
 
   Future<OpenTonicListFull> fetchList(int listId) async {
@@ -435,39 +450,72 @@ class _ListPageState extends State<ListPage> {
     };
   }
 
+  void setChecked(int listItemId, bool checked) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverUrl = prefs.getString("server-url");
+    final username = prefs.getString("username");
+    final password = prefs.getString("password");
+    final authToken = base64Encode(utf8.encode("$username:$password"));
+    final response = await http.post(
+      Uri.parse("$serverUrl/api/check-list-item/$listItemId?checked=$checked"),
+      headers: {HttpHeaders.authorizationHeader: "Basic $authToken"},
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        setList(widget.listId);
+      });
+    } else {
+      throw Exception("Failed to fetch list: $response");
+    }
+  }
+
+  List<Widget> listItemsToListTiles(List<OpenTonicListItem> listItems) {
+    List<Widget> list = List.empty(growable: true);
+    for (var i = 0; i < listItems.length; i++) {
+      if (listItemStates[i] == 2) {
+        list.add(
+          ListTile(
+            leading: Container(
+              constraints: BoxConstraints.tightFor(width: 12, height: 12),
+              margin: EdgeInsetsGeometry.only(left: 16, right: 20),
+              child: CircularProgressIndicator(),
+            ),
+            title: Text(listItems[i].name),
+            trailing: Icon(categoryToIcon(listItems[i].category)),
+          ),
+        );
+      } else {
+        list.add(
+          ListTile(
+            title: Text(listItems[i].name),
+            leading: Checkbox(
+              value: listItemStates[i] == 1,
+              onChanged: (_) {
+                setState(() {
+                  listItemStates[i] = 2;
+                });
+                setChecked(listItems[i].id, !listItems[i].checked);
+              },
+            ),
+            dense: true,
+            trailing: Icon(categoryToIcon(listItems[i].category)),
+          ),
+        );
+      }
+    }
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: fetchList(widget.listId),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          return Scaffold(
-            appBar: AppBar(title: Text(snapshot.data!.name)),
-            body: ListView(
-              children: snapshot.data!.listItems
-                  .map(
-                    (listItem) => ListTile(
-                      title: Text(listItem.name),
-                      leading: Checkbox(
-                        value: listItem.checked,
-                        onChanged: (value) {},
-                      ),
-                      dense: true,
-                      trailing: Icon(categoryToIcon(listItem.category)),
-                    ),
-                  )
-                  .toList(),
-            ),
-          );
-        } else if (snapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(title: Text("Error while loading list")),
-            body: Text(snapshot.error.toString()),
-          );
-        }
-        return Center(child: CircularProgressIndicator());
-      },
-    );
+    if (loaded) {
+      return Scaffold(
+        appBar: AppBar(title: Text(list.name)),
+        body: ListView(children: listItemsToListTiles(list.listItems)),
+      );
+    }
+    return Center(child: CircularProgressIndicator());
   }
 }
 
