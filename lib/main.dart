@@ -154,7 +154,7 @@ class _HomePageState extends State<HomePage> {
                     style: TextStyle(fontSize: 32),
                   ),
                   Container(
-                    padding: EdgeInsetsGeometry.all(32),
+                    padding: EdgeInsets.all(32),
                     child: Text("${snapshot.error}"),
                   ),
                 ],
@@ -171,7 +171,7 @@ class _HomePageState extends State<HomePage> {
           context: context,
           builder: (context) => SimpleDialog(
             title: Text("Add list"),
-            contentPadding: EdgeInsetsGeometry.all(16),
+            contentPadding: EdgeInsets.all(16),
             children: [
               TextField(
                 controller: addListNameController,
@@ -277,7 +277,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(title: Text("Settings")),
       body: ListView(
-        padding: EdgeInsetsGeometry.all(16),
+        padding: EdgeInsets.all(16),
         children: [
           Column(
             spacing: 16,
@@ -286,7 +286,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Text("Server Settings", style: TextStyle(fontSize: 24)),
               Card.filled(
                 child: Container(
-                  padding: EdgeInsetsGeometry.all(16),
+                  padding: EdgeInsets.all(16),
                   child: Column(
                     spacing: 16,
                     children: [
@@ -478,7 +478,7 @@ class _ListPageState extends State<ListPage> {
           ListTile(
             leading: Container(
               constraints: BoxConstraints.tightFor(width: 12, height: 12),
-              margin: EdgeInsetsGeometry.only(left: 16, right: 20),
+              margin: EdgeInsets.only(left: 16, right: 20),
               child: CircularProgressIndicator(),
             ),
             title: Text(listItems[i].name),
@@ -513,6 +513,22 @@ class _ListPageState extends State<ListPage> {
       return Scaffold(
         appBar: AppBar(title: Text(list.name)),
         body: ListView(children: listItemsToListTiles(list.listItems)),
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.add),
+          onPressed: () async {
+            final result = await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => AddListItemPage(listId: widget.listId),
+              ),
+            );
+            if (result) {
+              setState(() {
+                loaded = false;
+                setList(widget.listId);
+              });
+            }
+          },
+        ),
       );
     }
     return Center(child: CircularProgressIndicator());
@@ -593,5 +609,107 @@ class OpenTonicListItem {
         'Failed to parse ListItem: ${json.toString()}',
       ),
     };
+  }
+}
+
+class AddListItemPage extends StatefulWidget {
+  final int listId;
+  const AddListItemPage({super.key, required this.listId});
+
+  @override
+  State<AddListItemPage> createState() => _AddListItemPageState();
+}
+
+class _AddListItemPageState extends State<AddListItemPage> {
+  late SharedPreferences prefs;
+  final itemNameController = TextEditingController();
+  var changed = false;
+
+  Future<void> loadPrefs() async {
+    final prefsLocal = await SharedPreferences.getInstance();
+    setState(() {
+      prefs = prefsLocal;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadPrefs();
+  }
+
+  Future<int> addListItem(String listItemName, int listId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverUrl = prefs.getString("server-url");
+    final username = prefs.getString("username");
+    final password = prefs.getString("password");
+    final authToken = base64Encode(utf8.encode("$username:$password"));
+    final response = await http.post(
+      Uri.parse("$serverUrl/api/add-list-item/$listId"),
+      headers: {
+        HttpHeaders.authorizationHeader: "Basic $authToken",
+        HttpHeaders.contentTypeHeader: "application/json",
+      },
+      body: jsonEncode({"name": listItemName}),
+    );
+
+    if (response.statusCode == 200) {
+      return int.parse(response.body);
+    } else {
+      throw Exception("Failed to add list item: ${response.statusCode}");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: BackButton(
+          onPressed: () {
+            Navigator.of(context).pop(changed);
+          },
+        ),
+        title: Text("Add list item"),
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            child: TextField(
+              controller: itemNameController,
+              decoration: InputDecoration(
+                labelText: "Item name",
+                border: OutlineInputBorder(),
+                hintText: "Apples",
+              ),
+              autocorrect: true,
+              keyboardType: TextInputType.text,
+              onSubmitted: (value) {
+                if (value.isNotEmpty) {
+                  changed = true;
+                  addListItem(value, widget.listId);
+                  itemNameController.clear();
+                }
+              },
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              children: [
+                ListTile(title: Text("Apple"), leading: Icon(Icons.add)),
+                ListTile(title: Text("Cookies"), leading: Icon(Icons.add)),
+                ListTile(title: Text("Flour"), leading: Icon(Icons.add)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.check),
+        onPressed: () {
+          Navigator.of(context).pop(changed);
+        },
+      ),
+    );
   }
 }
