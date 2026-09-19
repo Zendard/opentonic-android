@@ -52,7 +52,6 @@ class _HomePageState extends State<HomePage> {
   late Future<List<OpenTonicList>> futureLists;
   late SharedPreferences prefs;
   final addListNameController = TextEditingController();
-  late bool loaded = false;
 
   @override
   void initState() {
@@ -111,11 +110,17 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final changed = await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SettingsPage()),
               );
+
+              if (changed) {
+                setState(() {
+                  futureLists = fetchLists();
+                });
+              }
             },
           ),
         ],
@@ -181,7 +186,23 @@ class _HomePageState extends State<HomePage> {
                 ),
                 keyboardType: TextInputType.text,
                 onSubmitted: (value) {
-                  addList(value);
+                  addList(value)
+                      .catchError((error) {
+                        if (!context.mounted) return 0;
+                        Navigator.pop(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger.showSnackBar(
+                          SnackBar(content: Text("Error:$error")),
+                        );
+                        return 0;
+                      })
+                      .then((_) {
+                        if (!context.mounted) return 0;
+                        Navigator.pop(context);
+                        setState(() {
+                          futureLists = fetchLists();
+                        });
+                      });
                 },
               ),
               TextButton(
@@ -247,6 +268,8 @@ class _SettingsPageState extends State<SettingsPage> {
   final serverUrlContoller = TextEditingController();
   final usernameContoller = TextEditingController();
   final passwordContoller = TextEditingController();
+  var changed = false;
+  var edited = false;
 
   @override
   void initState() {
@@ -275,7 +298,14 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text("Settings")),
+      appBar: AppBar(
+        title: Text("Settings"),
+        leading: BackButton(
+          onPressed: () {
+            Navigator.of(context).pop(changed);
+          },
+        ),
+      ),
       body: ListView(
         padding: EdgeInsets.all(16),
         children: [
@@ -302,6 +332,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         onSubmitted: (value) {
                           prefs.setString("server-url", value);
                         },
+                        onChanged: (_) {
+                          setState(() {
+                            edited = true;
+                          });
+                        },
                       ),
                       TextField(
                         controller: usernameContoller,
@@ -314,6 +349,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         keyboardType: TextInputType.name,
                         onSubmitted: (value) {
                           prefs.setString("username", value);
+                        },
+                        onChanged: (_) {
+                          setState(() {
+                            edited = true;
+                          });
                         },
                       ),
                       TextField(
@@ -329,6 +369,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         onSubmitted: (value) {
                           prefs.setString("password", value);
                         },
+                        onChanged: (_) {
+                          setState(() {
+                            edited = true;
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -338,6 +383,24 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+      floatingActionButton: () {
+        if (!edited) {
+          return null;
+        }
+
+        return FloatingActionButton(
+          child: Icon(Icons.save),
+          onPressed: () {
+            prefs.setString("server-url", serverUrlContoller.text);
+            prefs.setString("username", usernameContoller.text);
+            prefs.setString("password", passwordContoller.text);
+            setState(() {
+              edited = false;
+            });
+            changed = true;
+          },
+        );
+      }(),
     );
   }
 }
@@ -671,78 +734,69 @@ class _AddListItemPageState extends State<AddListItemPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(
-          onPressed: () async {
-            if (itemNameController.text.isNotEmpty) {
-              await addListItem(itemNameController.text, widget.listId);
-              itemNameController.clear();
-              itemNameFocusNode.requestFocus();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (itemNameController.text.isNotEmpty) {
+          setState(() {
+            addingListItem = true;
+          });
+          changed = true;
+          await addListItem(itemNameController.text, widget.listId);
+          itemNameController.clear();
+        }
+
+        if (!context.mounted || didPop) return;
+        Navigator.of(context).pop(true);
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text("Add list item")),
+        body: Column(
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              child: TextField(
+                controller: itemNameController,
+                focusNode: itemNameFocusNode,
+                decoration: InputDecoration(
+                  labelText: "Item name",
+                  border: OutlineInputBorder(),
+                  hintText: "Apples",
+                ),
+                autocorrect: true,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.next,
+                onSubmitted: (value) async {
+                  if (value.isNotEmpty) {
+                    addListItem(value, widget.listId);
+                    itemNameController.clear();
+                    itemNameFocusNode.requestFocus();
+                  }
+                },
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  ListTile(title: Text("Apple"), leading: Icon(Icons.add)),
+                  ListTile(title: Text("Cookies"), leading: Icon(Icons.add)),
+                  ListTile(title: Text("Flour"), leading: Icon(Icons.add)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          child: () {
+            if (addingListItem) {
+              return CircularProgressIndicator();
             }
-            if (!context.mounted) {
-              return;
-            }
-            Navigator.of(context).pop(changed);
+            return Icon(Icons.check);
+          }(),
+          onPressed: () {
+            Navigator.of(context).maybePop();
           },
         ),
-        title: Text("Add list item"),
-      ),
-      body: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.all(16),
-            child: TextField(
-              controller: itemNameController,
-              focusNode: itemNameFocusNode,
-              decoration: InputDecoration(
-                labelText: "Item name",
-                border: OutlineInputBorder(),
-                hintText: "Apples",
-              ),
-              autocorrect: true,
-              keyboardType: TextInputType.text,
-              textInputAction: TextInputAction.next,
-              onSubmitted: (value) async {
-                if (value.isNotEmpty) {
-                  addListItem(value, widget.listId);
-                  itemNameController.clear();
-                  itemNameFocusNode.requestFocus();
-                }
-              },
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              children: [
-                ListTile(title: Text("Apple"), leading: Icon(Icons.add)),
-                ListTile(title: Text("Cookies"), leading: Icon(Icons.add)),
-                ListTile(title: Text("Flour"), leading: Icon(Icons.add)),
-              ],
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: () {
-          if (addingListItem) {
-            return CircularProgressIndicator();
-          }
-          return Icon(Icons.check);
-        }(),
-        onPressed: () async {
-          if (itemNameController.text.isNotEmpty) {
-            changed = true;
-            await addListItem(itemNameController.text, widget.listId);
-            itemNameController.clear();
-            itemNameFocusNode.requestFocus();
-          }
-
-          if (!context.mounted) {
-            return;
-          }
-          Navigator.of(context).pop(changed);
-        },
       ),
     );
   }
