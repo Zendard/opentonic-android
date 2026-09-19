@@ -146,7 +146,14 @@ class _HomePageState extends State<HomePage> {
                 ),
               );
             }).toList();
-            return ListView(children: listItems);
+            return RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  futureLists = fetchLists();
+                });
+              },
+              child: ListView(children: listItems),
+            );
           } else if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -474,7 +481,7 @@ class _ListPageState extends State<ListPage> {
     setList(widget.listId);
   }
 
-  void setList(int listId) async {
+  Future<void> setList(int listId) async {
     final listLocal = await fetchList(listId);
     setState(() {
       list = listLocal;
@@ -575,7 +582,13 @@ class _ListPageState extends State<ListPage> {
     if (loaded) {
       return Scaffold(
         appBar: AppBar(title: Text(list.name)),
-        body: ListView(children: listItemsToListTiles(list.listItems)),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await setList(widget.listId);
+            return;
+          },
+          child: ListView(children: listItemsToListTiles(list.listItems)),
+        ),
         floatingActionButton: FloatingActionButton(
           child: Icon(Icons.add),
           onPressed: () async {
