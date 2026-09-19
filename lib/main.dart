@@ -625,6 +625,7 @@ class _AddListItemPageState extends State<AddListItemPage> {
   final itemNameController = TextEditingController();
   final itemNameFocusNode = FocusNode();
   var changed = false;
+  var addingListItem = false;
 
   Future<void> loadPrefs() async {
     final prefsLocal = await SharedPreferences.getInstance();
@@ -640,6 +641,9 @@ class _AddListItemPageState extends State<AddListItemPage> {
   }
 
   Future<int> addListItem(String listItemName, int listId) async {
+    setState(() {
+      addingListItem = true;
+    });
     final prefs = await SharedPreferences.getInstance();
     final serverUrl = prefs.getString("server-url");
     final username = prefs.getString("username");
@@ -655,6 +659,10 @@ class _AddListItemPageState extends State<AddListItemPage> {
     );
 
     if (response.statusCode == 200) {
+      changed = true;
+      setState(() {
+        addingListItem = false;
+      });
       return int.parse(response.body);
     } else {
       throw Exception("Failed to add list item: ${response.statusCode}");
@@ -666,7 +674,15 @@ class _AddListItemPageState extends State<AddListItemPage> {
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(
-          onPressed: () {
+          onPressed: () async {
+            if (itemNameController.text.isNotEmpty) {
+              await addListItem(itemNameController.text, widget.listId);
+              itemNameController.clear();
+              itemNameFocusNode.requestFocus();
+            }
+            if (!context.mounted) {
+              return;
+            }
             Navigator.of(context).pop(changed);
           },
         ),
@@ -687,9 +703,8 @@ class _AddListItemPageState extends State<AddListItemPage> {
               autocorrect: true,
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.next,
-              onSubmitted: (value) {
+              onSubmitted: (value) async {
                 if (value.isNotEmpty) {
-                  changed = true;
                   addListItem(value, widget.listId);
                   itemNameController.clear();
                   itemNameFocusNode.requestFocus();
@@ -709,8 +724,23 @@ class _AddListItemPageState extends State<AddListItemPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.check),
-        onPressed: () {
+        child: () {
+          if (addingListItem) {
+            return CircularProgressIndicator();
+          }
+          return Icon(Icons.check);
+        }(),
+        onPressed: () async {
+          if (itemNameController.text.isNotEmpty) {
+            changed = true;
+            await addListItem(itemNameController.text, widget.listId);
+            itemNameController.clear();
+            itemNameFocusNode.requestFocus();
+          }
+
+          if (!context.mounted) {
+            return;
+          }
           Navigator.of(context).pop(changed);
         },
       ),
