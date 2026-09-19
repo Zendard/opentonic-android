@@ -623,6 +623,7 @@ class AddListItemPage extends StatefulWidget {
 class _AddListItemPageState extends State<AddListItemPage> {
   late SharedPreferences prefs;
   final itemNameController = TextEditingController();
+  final itemNameFocusNode = FocusNode();
   var changed = false;
 
   Future<void> loadPrefs() async {
@@ -677,6 +678,7 @@ class _AddListItemPageState extends State<AddListItemPage> {
             padding: EdgeInsets.all(16),
             child: TextField(
               controller: itemNameController,
+              focusNode: itemNameFocusNode,
               decoration: InputDecoration(
                 labelText: "Item name",
                 border: OutlineInputBorder(),
@@ -684,11 +686,13 @@ class _AddListItemPageState extends State<AddListItemPage> {
               ),
               autocorrect: true,
               keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.next,
               onSubmitted: (value) {
                 if (value.isNotEmpty) {
                   changed = true;
                   addListItem(value, widget.listId);
                   itemNameController.clear();
+                  itemNameFocusNode.requestFocus();
                 }
               },
             ),
