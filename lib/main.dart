@@ -540,39 +540,138 @@ class _ListPageState extends State<ListPage> {
     }
   }
 
+  Future<int> deleteListItem(int listItemId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverUrl = prefs.getString("server-url");
+    final username = prefs.getString("username");
+    final password = prefs.getString("password");
+    final authToken = base64Encode(utf8.encode("$username:$password"));
+    final response = await http.post(
+      Uri.parse("$serverUrl/api/delete-list-item/$listItemId"),
+      headers: {HttpHeaders.authorizationHeader: "Basic $authToken"},
+    );
+
+    if (response.statusCode == 200) {
+      return int.parse(response.body);
+    } else {
+      throw Exception("Failed to delete list item: $response");
+    }
+  }
+
+  String formatAddedOn(DateTime addedOn) {
+    if (DateTime.now().difference(addedOn) <= Duration(days: 1)) {
+      return "${addedOn.hour}:${addedOn.minute}";
+    } else {
+      return "${addedOn.day}/${addedOn.month}";
+    }
+  }
+
   List<Widget> listItemsToListTiles(List<OpenTonicListItem> listItems) {
     List<Widget> list = List.empty(growable: true);
     for (var i = 0; i < listItems.length; i++) {
-      if (listItemStates[i] == 2) {
-        list.add(
-          ListTile(
-            leading: Container(
-              constraints: BoxConstraints.tightFor(width: 12, height: 12),
-              margin: EdgeInsets.only(left: 16, right: 20),
-              child: CircularProgressIndicator(),
-            ),
-            title: Text(listItems[i].name),
-            trailing: Icon(categoryToIcon(listItems[i].category)),
+      list.add(
+        ListTile(
+          leading: Container(
+            constraints: BoxConstraints.tightFor(width: 12, height: 12),
+            margin: EdgeInsets.only(left: 16, right: 20),
+            child: () {
+              if (listItemStates[i] == 2) {
+                return CircularProgressIndicator();
+              }
+              return Checkbox(
+                value: listItemStates[i] == 1,
+                onChanged: (_) {
+                  setState(() {
+                    listItemStates[i] = 2;
+                  });
+                  setChecked(listItems[i].id, !listItems[i].checked);
+                },
+              );
+            }(),
           ),
-        );
-      } else {
-        list.add(
-          ListTile(
-            title: Text(listItems[i].name),
-            leading: Checkbox(
-              value: listItemStates[i] == 1,
-              onChanged: (_) {
-                setState(() {
-                  listItemStates[i] = 2;
-                });
-                setChecked(listItems[i].id, !listItems[i].checked);
+          title: Text(listItems[i].name),
+          trailing: Icon(categoryToIcon(listItems[i].category)),
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              builder: (context) {
+                return StatefulBuilder(
+                  builder: (context, setState) => Container(
+                    padding: EdgeInsets.all(64),
+                    child: Column(
+                      spacing: 16,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                listItems[i].name,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            Icon(categoryToIcon(listItems[i].category)),
+                          ],
+                        ),
+                        Expanded(
+                          child: Text(
+                            "Added by ${listItems[i].addedBy} on ${formatAddedOn(listItems[i].addedOn)}",
+                            textAlign: TextAlign.start,
+                          ),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            FilledButton(
+                              onPressed: () async {
+                                setState(() {
+                                  listItemStates[i] = 3;
+                                });
+                                await deleteListItem(listItems[i].id);
+                                await setList(widget.listId);
+
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .error,
+                                foregroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .onError,
+                              ),
+                              child: () {
+                                if (listItemStates[i] == 3) {
+                                  return SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onError,
+                                    ),
+                                  );
+                                }
+                                return SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: Icon(Icons.delete),
+                                );
+                              }(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               },
-            ),
-            dense: true,
-            trailing: Icon(categoryToIcon(listItems[i].category)),
-          ),
-        );
-      }
+            );
+          },
+        ),
+      );
     }
     return list;
   }
