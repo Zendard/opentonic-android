@@ -69,7 +69,7 @@ class OpenTonicAPI {
   }
 
   Future<OpenTonicListFull> list(int id) async {
-    final response = await _getRequest("/list/$id");
+    final response = await _getRequest("list/$id");
 
     if (response.statusCode == 200) {
       return OpenTonicListFull.fromJson(jsonDecode(response.body));

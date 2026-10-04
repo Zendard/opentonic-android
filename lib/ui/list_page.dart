@@ -15,30 +15,37 @@ class ListPage extends StatefulWidget {
 class _ListPageState extends State<ListPage> {
   late OpenTonicAPI openTonicAPI;
   late OpenTonicListFull list;
-  late bool loaded = false;
+  var pageState = PageState.loading();
   late List<int> listItemStates;
 
   @override
   void initState() {
     super.initState();
     () async {
-      openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
-      setList(widget.listId);
-      setState(() {
-        loaded = true;
-      });
+      try {
+        openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
+        setList(widget.listId);
+      } catch (e) {
+        pageState = PageState.error(e);
+      }
     }();
   }
 
   Future<void> setList(int listId) async {
-    final listLocal = await openTonicAPI.list(listId);
-    setState(() {
-      list = listLocal;
-      listItemStates = listLocal.listItems
-          .map((listItem) => listItem.checked ? 1 : 0)
-          .toList();
-      loaded = true;
-    });
+    try {
+      final listLocal = await openTonicAPI.list(listId);
+      setState(() {
+        list = listLocal;
+        listItemStates = listLocal.listItems
+            .map((listItem) => listItem.checked ? 1 : 0)
+            .toList();
+        pageState = PageState.ready();
+      });
+    } catch (e) {
+      setState(() {
+        pageState = PageState.error(e);
+      });
+    }
   }
 
   IconData categoryToIcon(String? category) {
@@ -180,53 +187,72 @@ class _ListPageState extends State<ListPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (loaded) {
+    if (pageState.isLoading()) {
+      return Center(child: CircularProgressIndicator());
+    } else if (pageState.isError()) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(list.name),
-          actions: () {
-            List<Widget> actions = [];
-            if (list.owner != openTonicAPI.username) return actions;
-            actions.add(
-              IconButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ListSettingsPage(listId: widget.listId),
-                    ),
-                  );
-                },
-                icon: Icon(Icons.settings),
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 32),
+              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
+              Container(
+                padding: EdgeInsets.all(32),
+                child: Text("${pageState.getError()}"),
               ),
-            );
-            return actions;
-          }(),
-        ),
-        body: RefreshIndicator(
-          onRefresh: () async {
-            await setList(widget.listId);
-            return;
-          },
-          child: ListView(children: listItemsToListTiles(list.listItems)),
-        ),
-        floatingActionButton: FloatingActionButton(
-          child: Icon(Icons.add),
-          onPressed: () async {
-            final result = await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => AddListItemPage(listId: widget.listId),
-              ),
-            );
-            if (result) {
-              setState(() {
-                loaded = false;
-                setList(widget.listId);
-              });
-            }
-          },
+            ],
+          ),
         ),
       );
     }
-    return Center(child: CircularProgressIndicator());
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(list.name),
+        actions: () {
+          List<Widget> actions = [];
+          if (list.owner != openTonicAPI.username) return actions;
+          actions.add(
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ListSettingsPage(listId: widget.listId),
+                  ),
+                );
+              },
+              icon: Icon(Icons.settings),
+            ),
+          );
+          return actions;
+        }(),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await setList(widget.listId);
+          return;
+        },
+        child: ListView(children: listItemsToListTiles(list.listItems)),
+      ),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AddListItemPage(listId: widget.listId),
+            ),
+          );
+          if (result) {
+            setState(() {
+              pageState = PageState.loading();
+              setList(widget.listId);
+            });
+          }
+        },
+      ),
+    );
   }
 }

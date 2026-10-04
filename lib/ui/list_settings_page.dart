@@ -12,9 +12,9 @@ class ListSettingsPage extends StatefulWidget {
 
 class _ListSettingsPageState extends State<ListSettingsPage> {
   late OpenTonicAPI openTonicAPI;
-  var loaded = false;
-  final listNameController = TextEditingController();
   late OpenTonicListFull list;
+  var pageState = PageState.loading();
+  final listNameController = TextEditingController();
   var changed = false;
   var edited = false;
 
@@ -22,30 +22,55 @@ class _ListSettingsPageState extends State<ListSettingsPage> {
   void initState() {
     super.initState();
     () async {
-      openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
-      setList(widget.listId);
-      setState(() {
-        loaded = true;
-      });
+      try {
+        openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
+        setList(widget.listId);
+      } catch (e) {
+        pageState = PageState.error(e);
+      }
     }();
   }
 
   void setList(int listId) async {
-    final listLocal = await openTonicAPI.list(widget.listId);
-    setState(() {
-      list = listLocal;
-      loaded = true;
-    });
+    try {
+      final listLocal = await openTonicAPI.list(widget.listId);
+      setState(() {
+        list = listLocal;
+        pageState = PageState.ready();
+      });
 
-    listNameController.text = list.name;
+      listNameController.text = list.name;
+    } catch (e) {
+      setState(() {
+        pageState = PageState.error(e);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!loaded) {
+    if (pageState.isLoading()) {
       return Scaffold(
         appBar: AppBar(title: Text("List settings")),
         body: Center(child: CircularProgressIndicator()),
+      );
+    } else if (pageState.isError()) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 32),
+              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
+              Container(
+                padding: EdgeInsets.all(32),
+                child: Text("${pageState.getError()}"),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:opentonic/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -9,7 +10,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  late bool loaded = false;
+  var pageState = PageState.loading();
   late SharedPreferences prefs;
   final serverUrlContoller = TextEditingController();
   final usernameContoller = TextEditingController();
@@ -20,17 +21,25 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    loadPrefs();
-    setState(() {
-      loaded = true;
-    });
+
+    () async {
+      try {
+        await loadPrefs();
+        setState(() {
+          pageState = PageState.ready();
+        });
+      } catch (e) {
+        setState(() {
+          pageState = PageState.error(e);
+        });
+      }
+    }();
   }
 
   Future<void> loadPrefs() async {
     final prefsLocal = await SharedPreferences.getInstance();
     setState(() {
       prefs = prefsLocal;
-      loaded = true;
       serverUrlContoller.text = prefs.getString("server-url") ?? "";
       usernameContoller.text = prefs.getString("username") ?? "";
       passwordContoller.text = prefs.getString("password") ?? "";
@@ -39,10 +48,28 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!loaded) {
+    if (pageState.isLoading()) {
       return Scaffold(
         appBar: AppBar(title: Text("Settings")),
-        body: CircularProgressIndicator(),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    } else if (pageState.isError()) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 32),
+              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
+              Container(
+                padding: EdgeInsets.all(32),
+                child: Text("${pageState.getError()}"),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
