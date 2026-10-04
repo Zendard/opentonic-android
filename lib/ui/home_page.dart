@@ -9,13 +9,12 @@ class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with OpenTonicPageState {
   late OpenTonicAPI openTonicAPI;
   late List<OpenTonicList> lists;
-  var pageState = PageState.loading();
   final addListNameController = TextEditingController();
 
   @override
@@ -55,50 +54,34 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  AppBar buildAppBar(BuildContext context) {
+    return AppBar(
+      title: const Text("OpenTonic"),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.settings),
+          onPressed: () async {
+            final changed =
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                ) ??
+                false;
+
+            if (changed) {
+              refreshLists();
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget buildReady(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("OpenTonic"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () async {
-              final changed =
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsPage(),
-                    ),
-                  ) ??
-                  false;
-
-              if (changed) {
-                refreshLists();
-              }
-            },
-          ),
-        ],
-      ),
+      appBar: buildAppBar(context),
       body: () {
-        if (pageState.isLoading()) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (pageState.isError()) {
-          return Center(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error, size: 32),
-                Text("An error has occurred:", style: TextStyle(fontSize: 32)),
-                Container(
-                  padding: EdgeInsets.all(32),
-                  child: Text("${pageState.getError()}"),
-                ),
-              ],
-            ),
-          );
-        }
-
         var listItems = lists.map((list) {
           return Card(
             child: ListTile(

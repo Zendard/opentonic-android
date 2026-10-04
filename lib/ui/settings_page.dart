@@ -6,11 +6,10 @@ class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
-  var pageState = PageState.loading();
+class _SettingsPageState extends State<SettingsPage> with OpenTonicPageState {
   late SharedPreferences prefs;
   final serverUrlContoller = TextEditingController();
   final usernameContoller = TextEditingController();
@@ -47,32 +46,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (pageState.isLoading()) {
-      return Scaffold(
-        appBar: AppBar(title: Text("Settings")),
-        body: Center(child: CircularProgressIndicator()),
-      );
-    } else if (pageState.isError()) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error, size: 32),
-              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
-              Container(
-                padding: EdgeInsets.all(32),
-                child: Text("${pageState.getError()}"),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget buildReady(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text("Settings"),

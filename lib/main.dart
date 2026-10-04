@@ -34,6 +34,47 @@ class PageState {
   }
 }
 
+mixin OpenTonicPageState {
+  var pageState = PageState.loading();
+
+  Widget buildReady(BuildContext context) {
+    return Scaffold(appBar: AppBar());
+  }
+
+  AppBar buildAppBar(BuildContext context) {
+    return AppBar();
+  }
+
+  Widget build(BuildContext context) {
+    if (pageState.isLoading()) {
+      return Scaffold(
+        appBar: buildAppBar(context),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    } else if (pageState.isError()) {
+      return Scaffold(
+        appBar: buildAppBar(context),
+        body: Center(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 32),
+              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
+              Container(
+                padding: EdgeInsets.all(32),
+                child: Text("${pageState.getError()}"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return buildReady(context);
+  }
+}
+
 class MainApp extends StatelessWidget {
   const MainApp({super.key});
 

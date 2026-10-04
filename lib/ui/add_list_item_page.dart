@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
 
 class AddListItemPage extends StatefulWidget {
@@ -9,7 +10,8 @@ class AddListItemPage extends StatefulWidget {
   State<AddListItemPage> createState() => _AddListItemPageState();
 }
 
-class _AddListItemPageState extends State<AddListItemPage> {
+class _AddListItemPageState extends State<AddListItemPage>
+    with OpenTonicPageState {
   late OpenTonicAPI openTonicAPI;
   final itemNameController = TextEditingController();
   final itemNameFocusNode = FocusNode();

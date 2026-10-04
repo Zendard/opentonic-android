@@ -12,10 +12,9 @@ class ListPage extends StatefulWidget {
   State<ListPage> createState() => _ListPageState();
 }
 
-class _ListPageState extends State<ListPage> {
+class _ListPageState extends State<ListPage> with OpenTonicPageState {
   late OpenTonicAPI openTonicAPI;
   late OpenTonicListFull list;
-  var pageState = PageState.loading();
   late List<int> listItemStates;
 
   @override
@@ -186,29 +185,7 @@ class _ListPageState extends State<ListPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (pageState.isLoading()) {
-      return Center(child: CircularProgressIndicator());
-    } else if (pageState.isError()) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error, size: 32),
-              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
-              Container(
-                padding: EdgeInsets.all(32),
-                child: Text("${pageState.getError()}"),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget buildReady(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(list.name),

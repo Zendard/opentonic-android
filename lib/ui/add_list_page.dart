@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
 
 class AddListPage extends StatefulWidget {
@@ -8,7 +9,7 @@ class AddListPage extends StatefulWidget {
   State<AddListPage> createState() => _AddListPageState();
 }
 
-class _AddListPageState extends State<AddListPage> {
+class _AddListPageState extends State<AddListPage> with OpenTonicPageState {
   late OpenTonicAPI openTonicAPI;
   final addListNameController = TextEditingController();
 
@@ -20,10 +21,11 @@ class _AddListPageState extends State<AddListPage> {
     });
   }
 
-  void addList(String listName) {
+  void addList(String listName, BuildContext context) {
     openTonicAPI
         .addList(listName)
         .catchError((error) {
+          if (!context.mounted) return 0;
           final messenger = ScaffoldMessenger.of(context);
           messenger.showSnackBar(SnackBar(content: Text("Error:$error")));
           return 0;
@@ -47,13 +49,13 @@ class _AddListPageState extends State<AddListPage> {
           ),
           keyboardType: TextInputType.text,
           onSubmitted: (value) {
-            addList(value);
+            addList(value, context);
             Navigator.of(context, rootNavigator: true).pop(true);
           },
         ),
         TextButton(
           onPressed: () async {
-            addList(addListNameController.text);
+            addList(addListNameController.text, context);
             Navigator.of(context, rootNavigator: true).pop(true);
           },
           child: Text("Add list"),
