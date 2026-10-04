@@ -53,7 +53,7 @@ class _AddListItemPageState extends State<AddListItemPage>
         }
 
         if (!context.mounted || didPop) return;
-        Navigator.of(context).pop(true);
+        Navigator.of(context).pop(changed);
       },
       child: Scaffold(
         appBar: AppBar(title: Text("Add list item")),
