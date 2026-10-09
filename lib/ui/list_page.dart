@@ -80,6 +80,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
           leading: Container(
             constraints: BoxConstraints.tightFor(width: 12, height: 12),
             margin: EdgeInsets.only(left: 16, right: 20),
+
             child: () {
               if (listItemStates[i] == 2) {
                 return CircularProgressIndicator();
@@ -95,89 +96,91 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
               );
             }(),
           ),
-          title: Text(listItems[i].name),
-          trailing: Icon(categoryToIcon(listItems[i].category)),
-          onTap: () {
-            showModalBottomSheet(
-              context: context,
-              builder: (context) {
-                return StatefulBuilder(
-                  builder: (context, setState) => Container(
-                    padding: EdgeInsets.all(64),
-                    child: Column(
-                      spacing: 16,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                listItems[i].name,
-                                style: Theme.of(context).textTheme.titleLarge,
+          title: GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (context) {
+                  return StatefulBuilder(
+                    builder: (context, setState) => Container(
+                      padding: EdgeInsets.all(64),
+                      child: Column(
+                        spacing: 16,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  listItems[i].name,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
                               ),
-                            ),
-                            Icon(categoryToIcon(listItems[i].category)),
-                          ],
-                        ),
-                        Expanded(
-                          child: Text(
-                            "Added by ${listItems[i].addedBy} ${formatAddedOn(listItems[i].addedOn)}",
-                            textAlign: TextAlign.start,
+                              Icon(categoryToIcon(listItems[i].category)),
+                            ],
                           ),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            FilledButton(
-                              onPressed: () async {
-                                setState(() {
-                                  listItemStates[i] = 3;
-                                });
-                                await openTonicAPI.deleteListItem(
-                                  listItems[i].id,
-                                );
-                                await setList(widget.listId);
+                          Expanded(
+                            child: Text(
+                              "Added by ${listItems[i].addedBy} ${formatAddedOn(listItems[i].addedOn)}",
+                              textAlign: TextAlign.start,
+                            ),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              FilledButton(
+                                onPressed: () async {
+                                  setState(() {
+                                    listItemStates[i] = 3;
+                                  });
+                                  await openTonicAPI.deleteListItem(
+                                    listItems[i].id,
+                                  );
+                                  await setList(widget.listId);
 
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .error,
-                                foregroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .onError,
-                              ),
-                              child: () {
-                                if (listItemStates[i] == 3) {
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                },
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .error,
+                                  foregroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .onError,
+                                ),
+                                child: () {
+                                  if (listItemStates[i] == 3) {
+                                    return SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onError,
+                                      ),
+                                    );
+                                  }
                                   return SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onError,
-                                    ),
+                                    child: Icon(Icons.delete),
                                   );
-                                }
-                                return SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: Icon(Icons.delete),
-                                );
-                              }(),
-                            ),
-                          ],
-                        ),
-                      ],
+                                }(),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            );
-          },
+                  );
+                },
+              );
+            },
+            child: Text(listItems[i].name),
+          ),
+          trailing: Icon(categoryToIcon(listItems[i].category)),
         ),
       );
     }
