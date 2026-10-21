@@ -26,11 +26,11 @@ class _AddListItemPageState extends State<AddListItemPage>
     }();
   }
 
-  Future<int> addListItem(String listItemName, int listId) async {
+  Future<OpenTonicListItem> addListItem(String listItemName, int listId) async {
     setState(() {
       addingListItem = true;
     });
-    final listItemId = await openTonicAPI.addListItem(listId, listItemName);
+    final listItemId = await openTonicAPI.createListItem(listId, listItemName);
     changed = true;
     setState(() {
       addingListItem = false;

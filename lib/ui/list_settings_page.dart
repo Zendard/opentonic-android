@@ -13,8 +13,9 @@ class ListSettingsPage extends StatefulWidget {
 class _ListSettingsPageState extends State<ListSettingsPage>
     with OpenTonicPageState {
   late OpenTonicAPI openTonicAPI;
-  late OpenTonicListFull list;
+  late OpenTonicList list;
   final listNameController = TextEditingController();
+  late List<String> users = List.empty();
   var changed = false;
   var edited = false;
 
@@ -33,13 +34,24 @@ class _ListSettingsPageState extends State<ListSettingsPage>
 
   void setList(int listId) async {
     try {
-      final listLocal = await openTonicAPI.list(widget.listId);
+      final listLocal = await openTonicAPI.getList(widget.listId);
       setState(() {
         list = listLocal;
         pageState = PageState.ready();
+        users = listLocal.users;
       });
 
       listNameController.text = list.name;
+    } catch (e) {
+      setState(() {
+        pageState = PageState.error(e);
+      });
+    }
+  }
+
+  Future<void> updateList(String? name) async {
+    try {
+      openTonicAPI.updateList(widget.listId, name, users);
     } catch (e) {
       setState(() {
         pageState = PageState.error(e);
@@ -85,19 +97,21 @@ class _ListSettingsPageState extends State<ListSettingsPage>
                 child: Wrap(
                   spacing: 16,
                   children: () {
-                    List<Widget> users = list.users
+                    List<Widget> usersChips = users
                         .map(
                           (user) => InputChip(
                             label: Text(user),
                             onDeleted: () {
-                              // Delete user from list
-                              changed = true;
+                              setState(() {
+                                users.remove(user);
+                                edited = true;
+                              });
                             },
                           ),
                         )
                         .toList();
 
-                    users.add(
+                    usersChips.add(
                       InputChip(
                         label: Text("+"),
                         onPressed: () async {
@@ -120,25 +134,10 @@ class _ListSettingsPageState extends State<ListSettingsPage>
                                   ),
                                   TextButton(
                                     onPressed: () async {
-                                      await openTonicAPI
-                                          .addUserToList(
-                                            widget.listId,
-                                            addUserController.text,
-                                          )
-                                          .catchError((error) async {
-                                            if (!context.mounted) return "";
-                                            Navigator.of(context).pop(true);
-                                            await showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: Text("An error occured"),
-                                                icon: Icon(Icons.error),
-                                                content: Text(error.toString()),
-                                              ),
-                                            );
-                                            return "";
-                                          });
-
+                                      setState(() {
+                                        users.add(addUserController.text);
+                                        edited = true;
+                                      });
                                       if (!context.mounted) return;
                                       Navigator.of(context).pop(true);
                                     },
@@ -149,12 +148,11 @@ class _ListSettingsPageState extends State<ListSettingsPage>
                             },
                           );
                           if (!result) return;
-                          setList(widget.listId);
                         },
                       ),
                     );
 
-                    return users;
+                    return usersChips;
                   }(),
                 ),
               ),
@@ -170,11 +168,11 @@ class _ListSettingsPageState extends State<ListSettingsPage>
         return FloatingActionButton(
           child: Icon(Icons.save),
           onPressed: () {
-            // Update list
+            updateList(listNameController.text);
             setState(() {
               edited = false;
+              changed = true;
             });
-            changed = true;
           },
         );
       }(),

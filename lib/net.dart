@@ -42,7 +42,27 @@ class OpenTonicAPI {
     return response;
   }
 
-  Future<List<OpenTonicList>> lists() async {
+  Future<dynamic> _putRequest(String path, Object? body) async {
+    final response = http.put(
+      Uri.parse("$_serverUrl/api/$path"),
+      headers: {
+        HttpHeaders.authorizationHeader: "Basic $_authToken",
+        HttpHeaders.contentTypeHeader: "application/json",
+      },
+      body: jsonEncode(body),
+    );
+    return response;
+  }
+
+  Future<dynamic> _deleteRequest(String path) async {
+    final response = http.delete(
+      Uri.parse("$_serverUrl/api/$path"),
+      headers: {HttpHeaders.authorizationHeader: "Basic $_authToken"},
+    );
+    return response;
+  }
+
+  Future<List<OpenTonicList>> getLists() async {
     final response = await _getRequest("lists");
 
     if (response.statusCode == 200) {
@@ -55,24 +75,25 @@ class OpenTonicAPI {
     }
   }
 
-  Future<int> addList(String listName) async {
-    final response = await _postRequest("create-list", {"name": listName});
+  Future<OpenTonicList> createList(String listName) async {
+    final response = await _postRequest("lists", {"name": listName});
 
     if (response.statusCode == 200) {
-      final body = jsonDecode(response.body);
-      return body["id"];
+      final json = jsonDecode(response.body);
+      return OpenTonicList.fromJson(json);
     } else {
       throw Exception(
-        "Failed to add list: ${response.statusCode}, ${response.body}",
+        "Failed to create list: ${response.statusCode}, ${response.body}",
       );
     }
   }
 
-  Future<OpenTonicListFull> list(int id) async {
-    final response = await _getRequest("list/$id");
+  Future<OpenTonicList> getList(int listId) async {
+    final response = await _getRequest("lists/$listId");
 
     if (response.statusCode == 200) {
-      return OpenTonicListFull.fromJson(jsonDecode(response.body));
+      var json = jsonDecode(response.body);
+      return OpenTonicList.fromJson(json);
     } else {
       throw Exception(
         "Failed to fetch list: ${response.statusCode}, ${response.body}",
@@ -80,55 +101,121 @@ class OpenTonicAPI {
     }
   }
 
-  Future<void> setChecked(int id, bool checked) async {
-    final response = await _postRequest(
-      "check-list-item/$id?checked=$checked",
-      {},
-    );
+  Future<OpenTonicList> updateList(
+    int listId,
+    String? listName,
+    List<String>? users,
+  ) async {
+    final response = await _putRequest("lists/$listId", {
+      "name": listName,
+      "users": users,
+    });
 
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return OpenTonicList.fromJson(json);
+    } else {
       throw Exception(
-        "Failed to check list item: ${response.statusCode}, ${response.body}",
+        "Failed to update list: ${response.statusCode}, ${response.body}",
       );
     }
   }
 
-  Future<int> deleteListItem(int id) async {
-    final response = await _postRequest("delete-list-item/$id", {});
+  Future<int> deleteList(int listId) async {
+    final response = await _deleteRequest("lists/$listId");
 
     if (response.statusCode == 200) {
       return int.parse(response.body);
     } else {
       throw Exception(
-        "Failed to delete list item: ${response.statusCode}, ${response.body}",
+        "Failed to delete list: ${response.statusCode}, ${response.body}",
       );
     }
   }
 
-  Future<String> addUserToList(int listId, String username) async {
-    final response = await _postRequest("add-user-to-list/$listId", {
-      "user": username,
+  Future<List<OpenTonicListItem>> getListItems(int listId) async {
+    final response = await _getRequest("lists/$listId/items");
+
+    if (response.statusCode == 200) {
+      var strList = List.from(jsonDecode(response.body));
+      return strList.map((str) => OpenTonicListItem.fromJson(str)).toList();
+    } else {
+      throw Exception(
+        "Failed to fetch listItems: ${response.statusCode}, ${response.body}",
+      );
+    }
+  }
+
+  Future<OpenTonicListItem> createListItem(
+    int listId,
+    String listItemName,
+  ) async {
+    final response = await _postRequest("lists/$listId/items", {
+      "name": listItemName,
     });
 
     if (response.statusCode == 200) {
-      return response.body;
+      final json = jsonDecode(response.body);
+      return OpenTonicListItem.fromJson(json);
     } else {
       throw Exception(
-        "Failed to add user: ${response.statusCode}, ${response.body}",
+        "Failed to create list item: ${response.statusCode}, ${response.body}",
       );
     }
   }
 
-  Future<int> addListItem(int listId, String listItem) async {
-    final response = await _postRequest("add-list-item/$listId", {
-      "name": listItem,
+  Future<OpenTonicListItem> getListItem(int listId, int listItemId) async {
+    final response = await _getRequest("lists/$listId/items/$listItemId");
+
+    if (response.statusCode == 200) {
+      var json = jsonDecode(response.body);
+      return OpenTonicListItem.fromJson(json);
+    } else {
+      throw Exception(
+        "Failed to fetch listItem: ${response.statusCode}, ${response.body}",
+      );
+    }
+  }
+
+  Future<OpenTonicListItem> updateListItem(
+    int listId,
+    int listItemId,
+    bool checked,
+  ) async {
+    final response = await _putRequest("lists/$listId/items/$listItemId", {
+      "checked": checked,
     });
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return OpenTonicListItem.fromJson(json);
+    } else {
+      throw Exception(
+        "Failed to update listItem: ${response.statusCode}, ${response.body}",
+      );
+    }
+  }
+
+  Future<int> deleteListItem(int listId, int listItemId) async {
+    final response = await _deleteRequest("lists/$listId/items/$listItemId");
 
     if (response.statusCode == 200) {
       return int.parse(response.body);
     } else {
       throw Exception(
-        "Failed to add list item: ${response.statusCode}, ${response.body}",
+        "Failed to delete listItem: ${response.statusCode}, ${response.body}",
+      );
+    }
+  }
+
+  Future<List<OpenTonicProduct>> queryProducts(int listId, String query) async {
+    final response = await _getRequest("lists/$listId/products?q=$query");
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(
+        "Failed to query products: ${response.statusCode}, ${response.body}",
       );
     }
   }

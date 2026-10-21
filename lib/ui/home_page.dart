@@ -23,7 +23,7 @@ class _HomePageState extends State<HomePage> with OpenTonicPageState {
     () async {
       openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
       try {
-        lists = await openTonicAPI.lists();
+        lists = await openTonicAPI.getLists();
         setState(() {
           pageState = PageState.ready();
         });
@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> with OpenTonicPageState {
 
     try {
       openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
-      lists = await openTonicAPI.lists();
+      lists = await openTonicAPI.getLists();
       setState(() {
         pageState = PageState.ready();
       });

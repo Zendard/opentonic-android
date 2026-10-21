@@ -23,12 +23,12 @@ class _AddListPageState extends State<AddListPage> with OpenTonicPageState {
 
   void addList(String listName, BuildContext context) {
     openTonicAPI
-        .addList(listName)
+        .createList(listName)
         .catchError((error) {
-          if (!context.mounted) return 0;
+          if (!context.mounted) throw Error();
           final messenger = ScaffoldMessenger.of(context);
           messenger.showSnackBar(SnackBar(content: Text("Error:$error")));
-          return 0;
+          throw Error();
         })
         .then((listId) {
           return listId;

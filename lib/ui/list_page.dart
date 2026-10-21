@@ -14,7 +14,8 @@ class ListPage extends StatefulWidget {
 
 class _ListPageState extends State<ListPage> with OpenTonicPageState {
   late OpenTonicAPI openTonicAPI;
-  late OpenTonicListFull list;
+  late OpenTonicList list;
+  late List<OpenTonicListItem> listItems;
   late List<int> listItemStates;
 
   @override
@@ -32,10 +33,13 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
 
   Future<void> setList(int listId) async {
     try {
-      final listLocal = await openTonicAPI.list(listId);
+      final listLocal = await openTonicAPI.getList(listId);
+      final listItemsLocal = await openTonicAPI.getListItems(listId);
       setState(() {
+        pageState = PageState.loading();
         list = listLocal;
-        listItemStates = listLocal.listItems
+        listItems = listItemsLocal;
+        listItemStates = listItemsLocal
             .map((listItem) => listItem.checked ? 1 : 0)
             .toList();
         pageState = PageState.ready();
@@ -58,7 +62,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
   }
 
   void setChecked(int listItemId, bool checked) async {
-    await openTonicAPI.setChecked(listItemId, checked);
+    await openTonicAPI.updateListItem(widget.listId, listItemId, checked);
     setState(() {
       setList(widget.listId);
     });
@@ -134,6 +138,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                                     listItemStates[i] = 3;
                                   });
                                   await openTonicAPI.deleteListItem(
+                                    widget.listId,
                                     listItems[i].id,
                                   );
                                   await setList(widget.listId);
@@ -197,12 +202,15 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
           if (list.owner != openTonicAPI.username) return actions;
           actions.add(
             IconButton(
-              onPressed: () {
-                Navigator.of(context).push(
+              onPressed: () async {
+                final changed = await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => ListSettingsPage(listId: widget.listId),
                   ),
                 );
+                if (!changed) return;
+
+                setList(widget.listId);
               },
               icon: Icon(Icons.settings),
             ),
@@ -215,7 +223,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
           await setList(widget.listId);
           return;
         },
-        child: ListView(children: listItemsToListTiles(list.listItems)),
+        child: ListView(children: listItemsToListTiles(listItems)),
       ),
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add),

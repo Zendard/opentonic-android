@@ -110,53 +110,30 @@ class OpenTonicList {
   final int id;
   final String name;
   final String owner;
+  final List<String> users;
 
   const OpenTonicList({
     required this.id,
     required this.name,
     required this.owner,
+    required this.users,
   });
 
   factory OpenTonicList.fromJson(Map<String, dynamic> json) {
     return switch (json) {
-      {"id": int id, "name": String name, "owner": String owner} =>
-        OpenTonicList(id: id, name: name, owner: owner),
-      _ => throw const FormatException('Failed to load album.'),
-    };
-  }
-}
-
-class OpenTonicListFull {
-  final String name;
-  final String owner;
-  final List<String> users;
-  final List<OpenTonicListItem> listItems;
-
-  const OpenTonicListFull({
-    required this.name,
-    required this.owner,
-    required this.users,
-    required this.listItems,
-  });
-
-  factory OpenTonicListFull.fromJson(Map<String, dynamic> json) {
-    final jsonStr = json.toString();
-    return switch (json) {
       {
+        "id": int id,
         "name": String name,
         "owner": String owner,
         "users": List<dynamic> users,
-        "list_items": List<dynamic> listItems,
       } =>
-        OpenTonicListFull(
+        OpenTonicList(
+          id: id,
           name: name,
           owner: owner,
           users: users.map((user) => user.toString()).toList(),
-          listItems: listItems
-              .map((listItem) => OpenTonicListItem.fromJson(listItem))
-              .toList(),
         ),
-      _ => throw FormatException('Failed to fetch list: $jsonStr'),
+      _ => throw FormatException('Failed to parse List: ${json.toString()}'),
     };
   }
 }
@@ -165,7 +142,7 @@ class OpenTonicListItem {
   final int id;
   final String name;
   final bool checked;
-  final String? category;
+  final String category;
   final String addedBy;
   final DateTime addedOn;
 
@@ -184,7 +161,7 @@ class OpenTonicListItem {
         "id": int id,
         "name": String name,
         "checked": bool checked,
-        "category": String? category,
+        "category": String category,
         "added_by": String addedBy,
         "added_on": String addedOn,
       } =>
@@ -199,6 +176,26 @@ class OpenTonicListItem {
       _ => throw FormatException(
         'Failed to parse ListItem: ${json.toString()}',
       ),
+    };
+  }
+}
+
+class OpenTonicProduct {
+  final int id;
+  final String name;
+  final String category;
+
+  const OpenTonicProduct({
+    required this.id,
+    required this.name,
+    required this.category,
+  });
+
+  factory OpenTonicProduct.fromJson(Map<String, dynamic> json) {
+    return switch (json) {
+      {"id": int id, "name": String name, "category": String category} =>
+        OpenTonicProduct(id: id, name: name, category: category),
+      _ => throw FormatException('Failed to parse Product: ${json.toString()}'),
     };
   }
 }
