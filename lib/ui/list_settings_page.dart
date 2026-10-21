@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
+import 'package:opentonic/ui/home_page.dart';
 
 class ListSettingsPage extends StatefulWidget {
   final int listId;
@@ -52,6 +53,16 @@ class _ListSettingsPageState extends State<ListSettingsPage>
   Future<void> updateList(String? name) async {
     try {
       openTonicAPI.updateList(widget.listId, name, users);
+    } catch (e) {
+      setState(() {
+        pageState = PageState.error(e);
+      });
+    }
+  }
+
+  Future<void> deleteList(int listId) async {
+    try {
+      openTonicAPI.deleteList(widget.listId);
     } catch (e) {
       setState(() {
         pageState = PageState.error(e);
@@ -155,6 +166,49 @@ class _ListSettingsPageState extends State<ListSettingsPage>
                     return usersChips;
                   }(),
                 ),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text("Are you sure"),
+                      content: Text("Do you really want to delete this list?"),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Text("Cancel"),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await deleteList(widget.listId);
+                            if (!context.mounted) return;
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => const HomePage(),
+                              ),
+                              (_) => false,
+                            );
+                          },
+                          child: Text("Delete"),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                child: () {
+                  return SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: Icon(Icons.delete),
+                  );
+                }(),
               ),
             ],
           ),
