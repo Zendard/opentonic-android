@@ -212,7 +212,8 @@ class OpenTonicAPI {
     final response = await _getRequest("lists/$listId/products?q=$query");
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      var strList = List.from(jsonDecode(response.body));
+      return strList.map((str) => OpenTonicProduct.fromJson(str)).toList();
     } else {
       throw Exception(
         "Failed to query products: ${response.statusCode}, ${response.body}",

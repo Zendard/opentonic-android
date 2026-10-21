@@ -193,7 +193,7 @@ class OpenTonicProduct {
 
   factory OpenTonicProduct.fromJson(Map<String, dynamic> json) {
     return switch (json) {
-      {"id": int id, "name": String name, "category": String category} =>
+      {"id": int id, "name": String name, "category_name": String category} =>
         OpenTonicProduct(id: id, name: name, category: category),
       _ => throw FormatException('Failed to parse Product: ${json.toString()}'),
     };

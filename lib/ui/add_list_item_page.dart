@@ -17,6 +17,7 @@ class _AddListItemPageState extends State<AddListItemPage>
   final itemNameFocusNode = FocusNode();
   var changed = false;
   var addingListItem = false;
+  late List<OpenTonicProduct> suggestions = List.empty();
 
   @override
   void initState() {
@@ -36,6 +37,13 @@ class _AddListItemPageState extends State<AddListItemPage>
       addingListItem = false;
     });
     return listItemId;
+  }
+
+  Future<void> updateSuggestions(int listId, String query) async {
+    final suggestionsLocal = await openTonicAPI.queryProducts(listId, query);
+    setState(() {
+      suggestions = suggestionsLocal;
+    });
   }
 
   @override
@@ -76,18 +84,35 @@ class _AddListItemPageState extends State<AddListItemPage>
                   if (value.isNotEmpty) {
                     addListItem(value, widget.listId);
                     itemNameController.clear();
+                    updateSuggestions(widget.listId, "");
                     itemNameFocusNode.requestFocus();
                   }
+                },
+                onChanged: (value) {
+                  updateSuggestions(widget.listId, value);
                 },
               ),
             ),
             Expanded(
               child: ListView(
-                children: [
-                  ListTile(title: Text("Apple"), leading: Icon(Icons.add)),
-                  ListTile(title: Text("Cookies"), leading: Icon(Icons.add)),
-                  ListTile(title: Text("Flour"), leading: Icon(Icons.add)),
-                ],
+                children: () {
+                  return suggestions
+                      .map(
+                        (product) => GestureDetector(
+                          onTap: () {
+                            addListItem(itemNameController.text, widget.listId);
+                            itemNameController.clear();
+                            updateSuggestions(widget.listId, "");
+                            itemNameFocusNode.requestFocus();
+                          },
+                          child: ListTile(
+                            title: Text(product.name),
+                            leading: Icon(Icons.add),
+                          ),
+                        ),
+                      )
+                      .toList();
+                }(),
               ),
             ),
           ],
