@@ -199,3 +199,25 @@ class OpenTonicProduct {
     };
   }
 }
+
+class OpenTonicCategory {
+  final int id;
+  final String name;
+  final String iconId;
+
+  const OpenTonicCategory({
+    required this.id,
+    required this.name,
+    required this.iconId,
+  });
+
+  factory OpenTonicCategory.fromJson(Map<String, dynamic> json) {
+    return switch (json) {
+      {"id": int id, "name": String name, "icon_id": String iconId} =>
+        OpenTonicCategory(id: id, name: name, iconId: iconId),
+      _ => throw FormatException(
+        'Failed to parse Category: ${json.toString()}',
+      ),
+    };
+  }
+}
