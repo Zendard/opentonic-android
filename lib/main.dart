@@ -142,7 +142,7 @@ class OpenTonicListItem {
   final int id;
   final String name;
   final bool checked;
-  final String category;
+  final int categoryId;
   final String addedBy;
   final DateTime addedOn;
 
@@ -150,7 +150,7 @@ class OpenTonicListItem {
     required this.id,
     required this.name,
     required this.checked,
-    required this.category,
+    required this.categoryId,
     required this.addedBy,
     required this.addedOn,
   });
@@ -161,7 +161,7 @@ class OpenTonicListItem {
         "id": int id,
         "name": String name,
         "checked": bool checked,
-        "category": String category,
+        "category_id": int categoryId,
         "added_by": String addedBy,
         "added_on": String addedOn,
       } =>
@@ -169,7 +169,7 @@ class OpenTonicListItem {
           id: id,
           name: name,
           checked: checked,
-          category: category,
+          categoryId: categoryId,
           addedBy: addedBy,
           addedOn: DateTime.parse(addedOn),
         ),

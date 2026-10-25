@@ -362,4 +362,16 @@ class OpenTonicAPI {
       );
     }
   }
+
+  Future<String> getIcon(String iconId) async {
+    final response = await _getRequest("static/icons/$iconId");
+
+    if (response.statusCode == 200) {
+      return response.body;
+    } else {
+      throw Exception(
+        "Failed to get icon: ${response.statusCode}, ${response.body}",
+      );
+    }
+  }
 }
