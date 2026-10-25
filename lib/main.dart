@@ -183,18 +183,18 @@ class OpenTonicListItem {
 class OpenTonicProduct {
   final int id;
   final String name;
-  final String category;
+  final int categoryId;
 
   const OpenTonicProduct({
     required this.id,
     required this.name,
-    required this.category,
+    required this.categoryId,
   });
 
   factory OpenTonicProduct.fromJson(Map<String, dynamic> json) {
     return switch (json) {
-      {"id": int id, "name": String name, "category_name": String category} =>
-        OpenTonicProduct(id: id, name: name, category: category),
+      {"id": int id, "name": String name, "category_id": int categoryId} =>
+        OpenTonicProduct(id: id, name: name, categoryId: categoryId),
       _ => throw FormatException('Failed to parse Product: ${json.toString()}'),
     };
   }
