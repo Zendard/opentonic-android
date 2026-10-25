@@ -364,7 +364,10 @@ class OpenTonicAPI {
   }
 
   Future<String> getIcon(String iconId) async {
-    final response = await _getRequest("static/icons/$iconId");
+    final response = await http.get(
+      Uri.parse("$_serverUrl/static/icons/$iconId"),
+      headers: {HttpHeaders.authorizationHeader: "Basic $_authToken"},
+    );
 
     if (response.statusCode == 200) {
       return response.body;

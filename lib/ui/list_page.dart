@@ -28,10 +28,14 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
   @override
   void initState() {
     super.initState();
-    initStateAsync();
+    initStateAsync().catchError((e) {
+      setState(() {
+        pageState = PageState.error(e);
+      });
+    });
   }
 
-  void initStateAsync() async {
+  Future<void> initStateAsync() async {
     final prefs = await SharedPreferences.getInstance();
     user = prefs.getString("username");
     openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
@@ -151,14 +155,23 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                       );
                     }(),
                   ),
-                  trailing: () {
-                    final icon = icons[listItem];
-                    if (icon == null) {
-                      return Icon(Icons.category);
-                    } else {
-                      return SvgPicture.string(icon);
-                    }
-                  }(),
+                  trailing: SizedBox.square(
+                    dimension: 32,
+                    child: () {
+                      final icon = icons[listItem];
+                      if (icon == null) {
+                        return Icon(Icons.category);
+                      } else {
+                        return SvgPicture.string(
+                          icon,
+                          colorFilter: ColorFilter.mode(
+                            ColorScheme.of(context).primary,
+                            BlendMode.srcIn,
+                          ),
+                        );
+                      }
+                    }(),
+                  ),
                 ),
               )
               .toList();
