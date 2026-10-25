@@ -1,8 +1,12 @@
+import 'dart:collection';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
 import 'package:opentonic/ui/add_list_item_page.dart';
 import 'package:opentonic/ui/list_settings_page.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ListPage extends StatefulWidget {
   final int listId;
@@ -12,184 +16,53 @@ class ListPage extends StatefulWidget {
   State<ListPage> createState() => _ListPageState();
 }
 
+enum ListItemState { unchecked, loading, checked }
+
 class _ListPageState extends State<ListPage> with OpenTonicPageState {
-  late OpenTonicAPI openTonicAPI;
   late OpenTonicList list;
-  late List<OpenTonicListItem> listItems;
-  late List<int> listItemStates;
+  late HashMap<OpenTonicListItem, ListItemState> listItems;
+  late HashMap<OpenTonicListItem, String> icons;
+  late OpenTonicAPI openTonicAPI;
+  late String? user;
 
   @override
   void initState() {
     super.initState();
-    () async {
-      try {
-        openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
-        setList(widget.listId);
-      } catch (e) {
-        pageState = PageState.error(e);
-      }
-    }();
+    initStateAsync();
   }
 
-  Future<void> setList(int listId) async {
-    try {
-      final listLocal = await openTonicAPI.getList(listId);
-      final listItemsLocal = await openTonicAPI.getListItems(listId);
-      setState(() {
-        pageState = PageState.loading();
-        list = listLocal;
-        listItems = listItemsLocal;
-        listItemStates = listItemsLocal
-            .map((listItem) => listItem.checked ? 1 : 0)
-            .toList();
-        pageState = PageState.ready();
-      });
-    } catch (e) {
-      setState(() {
-        pageState = PageState.error(e);
-      });
-    }
-  }
+  void initStateAsync() async {
+    final prefs = await SharedPreferences.getInstance();
+    user = prefs.getString("username");
+    openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
 
-  IconData categoryToIcon(String? category) {
-    return switch (category) {
-      "Fruit & Vegetables" => Icons.apple,
-      "Meat" => Icons.outdoor_grill,
-      "Vegetarian" => Icons.category,
-      "Baking" => Icons.cake,
-      _ => Icons.category,
-    };
-  }
-
-  void setChecked(int listItemId, bool checked) async {
-    await openTonicAPI.updateListItem(widget.listId, listItemId, checked);
-    setState(() {
-      setList(widget.listId);
-    });
-  }
-
-  String formatAddedOn(DateTime addedOn) {
-    if (DateTime.now().difference(addedOn) <= Duration(days: 1)) {
-      return "at ${addedOn.hour.toString().padLeft(2, "0")}:${addedOn.minute.toString().padLeft(2, "0")}";
-    } else {
-      return "on ${addedOn.day.toString().padLeft(2, "0")}/${addedOn.month.toString().padLeft(2, "0")}";
-    }
-  }
-
-  List<Widget> listItemsToListTiles(List<OpenTonicListItem> listItems) {
-    List<Widget> list = List.empty(growable: true);
-    for (var i = 0; i < listItems.length; i++) {
-      list.add(
-        ListTile(
-          leading: Container(
-            constraints: BoxConstraints.tightFor(width: 12, height: 12),
-            margin: EdgeInsets.only(left: 16, right: 20),
-
-            child: () {
-              if (listItemStates[i] == 2) {
-                return CircularProgressIndicator();
-              }
-              return Checkbox(
-                value: listItemStates[i] == 1,
-                onChanged: (_) {
-                  setState(() {
-                    listItemStates[i] = 2;
-                  });
-                  setChecked(listItems[i].id, !listItems[i].checked);
-                },
-              );
-            }(),
-          ),
-          title: GestureDetector(
-            onTap: () {
-              showModalBottomSheet(
-                context: context,
-                builder: (context) {
-                  return StatefulBuilder(
-                    builder: (context, setState) => Container(
-                      padding: EdgeInsets.all(64),
-                      child: Column(
-                        spacing: 16,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  listItems[i].name,
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ),
-                              Icon(categoryToIcon(listItems[i].category)),
-                            ],
-                          ),
-                          Expanded(
-                            child: Text(
-                              "Added by ${listItems[i].addedBy} ${formatAddedOn(listItems[i].addedOn)}",
-                              textAlign: TextAlign.start,
-                            ),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              FilledButton(
-                                onPressed: () async {
-                                  setState(() {
-                                    listItemStates[i] = 3;
-                                  });
-                                  await openTonicAPI.deleteListItem(
-                                    widget.listId,
-                                    listItems[i].id,
-                                  );
-                                  await setList(widget.listId);
-
-                                  if (context.mounted) {
-                                    Navigator.of(context).pop();
-                                  }
-                                },
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Theme.of(context)
-                                      .colorScheme
-                                      .error,
-                                  foregroundColor: Theme.of(context)
-                                      .colorScheme
-                                      .onError,
-                                ),
-                                child: () {
-                                  if (listItemStates[i] == 3) {
-                                    return SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onError,
-                                      ),
-                                    );
-                                  }
-                                  return SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: Icon(Icons.delete),
-                                  );
-                                }(),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-            child: Text(listItems[i].name),
-          ),
-          trailing: Icon(categoryToIcon(listItems[i].category)),
-        ),
+    list = await openTonicAPI.getList(widget.listId);
+    final localListItems = await openTonicAPI.getListItems(widget.listId);
+    listItems = HashMap();
+    icons = HashMap();
+    for (var listItem in localListItems) {
+      listItems[listItem] = listItem.checked
+          ? ListItemState.checked
+          : ListItemState.unchecked;
+      final product = await openTonicAPI.getProduct(
+        widget.listId,
+        listItem.productId,
       );
+
+      final category = await openTonicAPI.getCategory(
+        widget.listId,
+        product.categoryId,
+      );
+      final iconId = category.iconId;
+
+      if (iconId != null) {
+        icons[listItem] = await openTonicAPI.getIcon(iconId);
+      }
     }
-    return list;
+
+    setState(() {
+      pageState = PageState.ready();
+    });
   }
 
   @override
@@ -198,48 +71,98 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
       appBar: AppBar(
         title: Text(list.name),
         actions: () {
-          List<Widget> actions = [];
-          if (list.owner != openTonicAPI.username) return actions;
-          actions.add(
+          if (list.owner != user) return null;
+          return [
             IconButton(
               onPressed: () async {
-                final changed = await Navigator.of(context).push(
+                final result = await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => ListSettingsPage(listId: widget.listId),
                   ),
                 );
-                if (!changed) return;
 
-                setList(widget.listId);
+                if (!result) return;
+
+                setState(() {
+                  pageState = PageState.loading();
+                });
+                setState(() async {
+                  initStateAsync();
+                });
               },
               icon: Icon(Icons.settings),
             ),
-          );
-          return actions;
+          ];
         }(),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await setList(widget.listId);
-          return;
-        },
-        child: ListView(children: listItemsToListTiles(listItems)),
-      ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
         onPressed: () async {
           final result = await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => AddListItemPage(listId: widget.listId),
+              builder: (_) => AddListItemPage(listId: widget.listId),
             ),
           );
-          if (result) {
-            setState(() {
-              pageState = PageState.loading();
-              setList(widget.listId);
-            });
-          }
+
+          if (!result) return;
+
+          setState(() {
+            pageState = PageState.loading();
+          });
+          setState(() async {
+            initStateAsync();
+          });
         },
+        child: Icon(Icons.add),
+      ),
+      body: ListView(
+        padding: EdgeInsets.all(16),
+        children: () {
+          return listItems.keys
+              .map(
+                (listItem) => ListTile(
+                  title: Text(listItem.name),
+                  leading: SizedBox.square(
+                    dimension: 16,
+                    child: () {
+                      if (listItems[listItem] == ListItemState.loading) {
+                        return CircularProgressIndicator();
+                      }
+
+                      return Checkbox(
+                        value: listItems[listItem] == ListItemState.checked,
+                        onChanged: (checked) async {
+                          setState(() {
+                            listItems[listItem] = ListItemState.loading;
+                            initStateAsync();
+                          });
+
+                          await openTonicAPI.updateListItem(
+                            widget.listId,
+                            listItem.id,
+                            checked == true,
+                          );
+
+                          setState(() {
+                            listItems[listItem] = checked == true
+                                ? ListItemState.checked
+                                : ListItemState.unchecked;
+                          });
+                        },
+                      );
+                    }(),
+                  ),
+                  trailing: () {
+                    final icon = icons[listItem];
+                    if (icon == null) {
+                      return Icon(Icons.category);
+                    } else {
+                      return SvgPicture.string(icon);
+                    }
+                  }(),
+                ),
+              )
+              .toList();
+        }(),
       ),
     );
   }
