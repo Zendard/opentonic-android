@@ -69,6 +69,14 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     });
   }
 
+  String addedOnToString(DateTime addedOn) {
+    if (DateTime.now().difference(addedOn) <= Duration(days: 1)) {
+      return "at ${addedOn.hour.toString().padLeft(2, "0")}:${addedOn.minute.toString().padLeft(2, "0")}";
+    } else {
+      return "on ${addedOn.day.toString().padLeft(2, "0")}/${addedOn.month.toString().padLeft(2, "0")}";
+    }
+  }
+
   @override
   Widget buildReady(BuildContext context) {
     return Scaffold(
@@ -124,7 +132,102 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
           return listItems.keys
               .map(
                 (listItem) => ListTile(
-                  title: Text(listItem.name),
+                  title: GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (context) => BottomSheet(
+                          onClosing: () {
+                            setState(() {
+                              pageState = PageState.loading();
+                            });
+                            setState(() async {
+                              await initStateAsync();
+                            });
+                          },
+                          builder: (context) => Container(
+                            padding: EdgeInsets.all(32),
+                            child: Column(
+                              spacing: 16,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  spacing: 16,
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: TextEditingController(
+                                          text: listItem.name,
+                                        ),
+                                        decoration: InputDecoration(
+                                          filled: true,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox.square(
+                                      dimension: 48,
+                                      child: IconButton(
+                                        icon: Center(
+                                          child: () {
+                                            final icon = icons[listItem];
+                                            if (icon == null) {
+                                              return Icon(Icons.category);
+                                            } else {
+                                              return SvgPicture.string(
+                                                icon,
+                                                colorFilter: ColorFilter.mode(
+                                                  ColorScheme.of(context)
+                                                      .primary,
+                                                  BlendMode.srcIn,
+                                                ),
+                                              );
+                                            }
+                                          }(),
+                                        ),
+                                        onPressed: () {},
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  "Added by ${listItem.addedBy} ${addedOnToString(listItem.addedOn)}",
+                                ),
+                                IconButton.filled(
+                                  icon: () {
+                                    if (listItems[listItem] ==
+                                        ListItemState.loading) {
+                                      return CircularProgressIndicator();
+                                    }
+                                    return Icon(Icons.delete);
+                                  }(),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: ColorScheme.of(context)
+                                        .error,
+                                  ),
+                                  onPressed: () async {
+                                    setState(() {
+                                      listItems[listItem] =
+                                          ListItemState.loading;
+                                    });
+                                    await openTonicAPI.deleteListItem(
+                                      widget.listId,
+                                      listItem.id,
+                                    );
+                                    setState(() {
+                                      listItems.remove(listItem);
+                                    });
+                                    if (!context.mounted) return;
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(listItem.name),
+                  ),
                   leading: SizedBox.square(
                     dimension: 16,
                     child: () {
