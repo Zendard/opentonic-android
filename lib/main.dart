@@ -142,7 +142,7 @@ class OpenTonicListItem {
   final int id;
   final String name;
   final bool checked;
-  final int categoryId;
+  final int productId;
   final String addedBy;
   final DateTime addedOn;
 
@@ -150,7 +150,7 @@ class OpenTonicListItem {
     required this.id,
     required this.name,
     required this.checked,
-    required this.categoryId,
+    required this.productId,
     required this.addedBy,
     required this.addedOn,
   });
@@ -161,7 +161,7 @@ class OpenTonicListItem {
         "id": int id,
         "name": String name,
         "checked": bool checked,
-        "category_id": int categoryId,
+        "product_id": int productId,
         "added_by": String addedBy,
         "added_on": String addedOn,
       } =>
@@ -169,7 +169,7 @@ class OpenTonicListItem {
           id: id,
           name: name,
           checked: checked,
-          categoryId: categoryId,
+          productId: productId,
           addedBy: addedBy,
           addedOn: DateTime.parse(addedOn),
         ),
@@ -203,18 +203,30 @@ class OpenTonicProduct {
 class OpenTonicCategory {
   final int id;
   final String name;
-  final String iconId;
+  final String? iconId;
+  final int orderIndex;
 
   const OpenTonicCategory({
     required this.id,
     required this.name,
     required this.iconId,
+    required this.orderIndex,
   });
 
   factory OpenTonicCategory.fromJson(Map<String, dynamic> json) {
     return switch (json) {
-      {"id": int id, "name": String name, "icon_id": String iconId} =>
-        OpenTonicCategory(id: id, name: name, iconId: iconId),
+      {
+        "id": int id,
+        "name": String name,
+        "icon_id": String? iconId,
+        "order_index": int orderIndex,
+      } =>
+        OpenTonicCategory(
+          id: id,
+          name: name,
+          iconId: iconId,
+          orderIndex: orderIndex,
+        ),
       _ => throw FormatException(
         'Failed to parse Category: ${json.toString()}',
       ),
