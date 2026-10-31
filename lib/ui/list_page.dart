@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:material_ui/material_ui.dart';
 import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
@@ -18,51 +16,115 @@ class ListPage extends StatefulWidget {
 
 enum ListItemState { unchecked, loading, checked }
 
+class ListItemUI {
+  final OpenTonicListItem listItem;
+  ListItemState state;
+
+  ListItemUI({required this.listItem, required this.state});
+
+  static Future<ListItemUI> fromListItem(
+    int listId,
+    OpenTonicListItem listItem,
+  ) async {
+    final state = listItem.checked
+        ? ListItemState.checked
+        : ListItemState.unchecked;
+
+    return ListItemUI(listItem: listItem, state: state);
+  }
+}
+
+class CategoryUI {
+  final OpenTonicCategory category;
+  final Widget icon;
+
+  CategoryUI({required this.category, required this.icon});
+
+  static Future<CategoryUI> fromOpenTonicAPI(
+    int listId,
+    int categoryId,
+    Color iconFill,
+    OpenTonicAPI openTonicAPI,
+  ) async {
+    final category = await openTonicAPI.getCategory(listId, categoryId);
+    late Widget iconLocal;
+    if (category.iconId != null) {
+      final iconStr = await openTonicAPI.getIcon(category.iconId!);
+
+      final iconFilter = ColorFilter.mode(iconFill, BlendMode.srcIn);
+      iconLocal = SvgPicture.string(iconStr, colorFilter: iconFilter);
+    } else {
+      iconLocal = Icon(Icons.category);
+    }
+
+    return CategoryUI(category: category, icon: iconLocal);
+  }
+
+  static Future<CategoryUI> fromCategory(
+    OpenTonicCategory category,
+    Color iconFill,
+    OpenTonicAPI openTonicAPI,
+  ) async {
+    late Widget iconLocal;
+    if (category.iconId != null) {
+      final iconStr = await openTonicAPI.getIcon(category.iconId!);
+
+      final iconFilter = ColorFilter.mode(iconFill, BlendMode.srcIn);
+      iconLocal = SvgPicture.string(iconStr, colorFilter: iconFilter);
+    } else {
+      iconLocal = Icon(Icons.category);
+    }
+
+    return CategoryUI(category: category, icon: iconLocal);
+  }
+}
+
 class _ListPageState extends State<ListPage> with OpenTonicPageState {
   late OpenTonicList list;
-  late HashMap<OpenTonicListItem, ListItemState> listItems;
-  late HashMap<OpenTonicListItem, String> icons;
+  late List<ListItemUI> listItems;
+  late List<CategoryUI> categories;
   late OpenTonicAPI openTonicAPI;
   late String? user;
 
   @override
   void initState() {
     super.initState();
-    initStateAsync().catchError((e) {
+    initStateAsync(context).catchError((e) {
       setState(() {
         pageState = PageState.error(e);
       });
     });
   }
 
-  Future<void> initStateAsync() async {
+  Future<void> initStateAsync(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     user = prefs.getString("username");
     openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
 
     list = await openTonicAPI.getList(widget.listId);
     final localListItems = await openTonicAPI.getListItems(widget.listId);
-    listItems = HashMap();
-    icons = HashMap();
+    listItems = List.empty(growable: true);
+    if (!context.mounted) return;
+    final colorScheme = ColorScheme.of(context);
+
     for (var listItem in localListItems) {
-      listItems[listItem] = listItem.checked
-          ? ListItemState.checked
-          : ListItemState.unchecked;
-      final product = await openTonicAPI.getProduct(
-        widget.listId,
-        listItem.productId,
-      );
-
-      final category = await openTonicAPI.getCategory(
-        widget.listId,
-        product.categoryId,
-      );
-      final iconId = category.iconId;
-
-      if (iconId != null) {
-        icons[listItem] = await openTonicAPI.getIcon(iconId);
-      }
+      listItems.add(await ListItemUI.fromListItem(widget.listId, listItem));
     }
+
+    final localCategories = await openTonicAPI.getCategories(widget.listId);
+    categories = List.empty(growable: true);
+
+    for (var category in localCategories) {
+      categories.add(
+        await CategoryUI.fromCategory(
+          category,
+          colorScheme.primary,
+          openTonicAPI,
+        ),
+      );
+    }
+
+    categories.sort((a, b) => a.category.id - b.category.id);
 
     setState(() {
       pageState = PageState.ready();
@@ -75,6 +137,142 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     } else {
       return "on ${addedOn.day.toString().padLeft(2, "0")}/${addedOn.month.toString().padLeft(2, "0")}";
     }
+  }
+
+  void _showListItemBottomSheet(int listItemIndex) {
+    final listItem = listItems[listItemIndex].listItem;
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => BottomSheet(
+        onClosing: () {
+          setState(() {
+            pageState = PageState.loading();
+          });
+          setState(() async {
+            await initStateAsync(context);
+          });
+        },
+        builder: (context) => Container(
+          padding: EdgeInsets.all(32),
+          child: Column(
+            spacing: 16,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                spacing: 16,
+                children: [
+                  Expanded(
+                    child: Text(listItem.name, style: TextStyle(fontSize: 32)),
+                  ),
+                  SizedBox.square(
+                    dimension: 48,
+                    child: IconButton.filledTonal(
+                      icon: Center(
+                        child: categories[listItem.categoryId - 1].icon,
+                      ),
+                      onPressed: () =>
+                          _showChangeCategoryDialog(listItemIndex, context),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                "Added by ${listItem.addedBy} ${addedOnToString(listItem.addedOn)}",
+              ),
+              IconButton.filled(
+                icon: () {
+                  if (listItems[listItemIndex].state == ListItemState.loading) {
+                    return CircularProgressIndicator();
+                  }
+                  return Icon(Icons.delete);
+                }(),
+                style: IconButton.styleFrom(
+                  backgroundColor: ColorScheme.of(context).error,
+                ),
+                onPressed: () async {
+                  setState(() {
+                    listItems[listItemIndex].state = ListItemState.loading;
+                  });
+
+                  if (!context.mounted) return;
+                  Navigator.of(context).pop();
+
+                  await openTonicAPI.deleteListItem(widget.listId, listItem.id);
+
+                  setState(() {
+                    listItems.removeAt(listItemIndex);
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showChangeCategoryDialog(
+    int listItemIndex,
+    BuildContext context,
+  ) async {
+    final listItemUI = listItems[listItemIndex];
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text("Choose a category"),
+        children: categories
+            .map(
+              (categoryUI) => SimpleDialogOption(
+                onPressed: () async {
+                  if (!context.mounted) return;
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
+
+                  setState(() {
+                    listItems[listItemIndex].state = ListItemState.loading;
+                  });
+
+                  await openTonicAPI.updateProduct(
+                    widget.listId,
+                    listItemUI.listItem.productId,
+                    null,
+                    categoryUI.category.id,
+                  );
+
+                  final listItem = await openTonicAPI.getListItem(
+                    widget.listId,
+                    listItemUI.listItem.id,
+                  );
+
+                  final localListItemUI = await ListItemUI.fromListItem(
+                    widget.listId,
+                    listItem,
+                  );
+
+                  setState(() {
+                    listItems[listItemIndex] = localListItemUI;
+                  });
+                },
+                child: Row(
+                  spacing: 16,
+                  children: [
+                    SizedBox.square(
+                      dimension: 48,
+                      child: IconButton.filledTonal(
+                        onPressed: () {},
+                        icon: categoryUI.icon,
+                      ),
+                    ),
+                    Text(categoryUI.category.name),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
   }
 
   @override
@@ -99,7 +297,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   pageState = PageState.loading();
                 });
                 setState(() async {
-                  initStateAsync();
+                  initStateAsync(context);
                 });
               },
               icon: Icon(Icons.settings),
@@ -121,7 +319,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
             pageState = PageState.loading();
           });
           setState(() async {
-            initStateAsync();
+            initStateAsync(context);
           });
         },
         child: Icon(Icons.add),
@@ -129,155 +327,52 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
       body: ListView(
         padding: EdgeInsets.all(16),
         children: () {
-          return listItems.keys
-              .map(
-                (listItem) => ListTile(
-                  title: GestureDetector(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (context) => BottomSheet(
-                          onClosing: () {
-                            setState(() {
-                              pageState = PageState.loading();
-                            });
-                            setState(() async {
-                              await initStateAsync();
-                            });
-                          },
-                          builder: (context) => Container(
-                            padding: EdgeInsets.all(32),
-                            child: Column(
-                              spacing: 16,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  spacing: 16,
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: TextEditingController(
-                                          text: listItem.name,
-                                        ),
-                                        decoration: InputDecoration(
-                                          filled: true,
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox.square(
-                                      dimension: 48,
-                                      child: IconButton(
-                                        icon: Center(
-                                          child: () {
-                                            final icon = icons[listItem];
-                                            if (icon == null) {
-                                              return Icon(Icons.category);
-                                            } else {
-                                              return SvgPicture.string(
-                                                icon,
-                                                colorFilter: ColorFilter.mode(
-                                                  ColorScheme.of(context)
-                                                      .primary,
-                                                  BlendMode.srcIn,
-                                                ),
-                                              );
-                                            }
-                                          }(),
-                                        ),
-                                        onPressed: () {},
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  "Added by ${listItem.addedBy} ${addedOnToString(listItem.addedOn)}",
-                                ),
-                                IconButton.filled(
-                                  icon: () {
-                                    if (listItems[listItem] ==
-                                        ListItemState.loading) {
-                                      return CircularProgressIndicator();
-                                    }
-                                    return Icon(Icons.delete);
-                                  }(),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: ColorScheme.of(context)
-                                        .error,
-                                  ),
-                                  onPressed: () async {
-                                    setState(() {
-                                      listItems[listItem] =
-                                          ListItemState.loading;
-                                    });
-                                    await openTonicAPI.deleteListItem(
-                                      widget.listId,
-                                      listItem.id,
-                                    );
-                                    setState(() {
-                                      listItems.remove(listItem);
-                                    });
-                                    if (!context.mounted) return;
-                                    Navigator.of(context).pop();
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Text(listItem.name),
-                  ),
-                  leading: SizedBox.square(
-                    dimension: 16,
-                    child: () {
-                      if (listItems[listItem] == ListItemState.loading) {
-                        return CircularProgressIndicator();
-                      }
-
-                      return Checkbox(
-                        value: listItems[listItem] == ListItemState.checked,
-                        onChanged: (checked) async {
-                          setState(() {
-                            listItems[listItem] = ListItemState.loading;
-                            initStateAsync();
-                          });
-
-                          await openTonicAPI.updateListItem(
-                            widget.listId,
-                            listItem.id,
-                            checked == true,
-                          );
-
-                          setState(() {
-                            listItems[listItem] = checked == true
-                                ? ListItemState.checked
-                                : ListItemState.unchecked;
-                          });
-                        },
-                      );
-                    }(),
-                  ),
-                  trailing: SizedBox.square(
-                    dimension: 32,
-                    child: () {
-                      final icon = icons[listItem];
-                      if (icon == null) {
-                        return Icon(Icons.category);
-                      } else {
-                        return SvgPicture.string(
-                          icon,
-                          colorFilter: ColorFilter.mode(
-                            ColorScheme.of(context).primary,
-                            BlendMode.srcIn,
-                          ),
-                        );
-                      }
-                    }(),
-                  ),
+          List<Widget> list = List.empty(growable: true);
+          for (var i = 0; i < listItems.length; i++) {
+            list.add(
+              ListTile(
+                title: GestureDetector(
+                  onTap: () => _showListItemBottomSheet(i),
+                  child: Text(listItems[i].listItem.name),
                 ),
-              )
-              .toList();
+                leading: SizedBox.square(
+                  dimension: 16,
+                  child: () {
+                    if (listItems[i].state == ListItemState.loading) {
+                      return CircularProgressIndicator();
+                    }
+
+                    return Checkbox(
+                      value: listItems[i].state == ListItemState.checked,
+                      onChanged: (checked) async {
+                        setState(() {
+                          listItems[i].state = ListItemState.loading;
+                          initStateAsync(context);
+                        });
+
+                        await openTonicAPI.updateListItem(
+                          widget.listId,
+                          listItems[i].listItem.id,
+                          checked == true,
+                        );
+
+                        setState(() {
+                          listItems[i].state = checked == true
+                              ? ListItemState.checked
+                              : ListItemState.unchecked;
+                        });
+                      },
+                    );
+                  }(),
+                ),
+                trailing: SizedBox.square(
+                  dimension: 32,
+                  child: categories[listItems[i].listItem.categoryId - 1].icon,
+                ),
+              ),
+            );
+          }
+          return list;
         }(),
       ),
     );
