@@ -324,56 +324,62 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
         },
         child: Icon(Icons.add),
       ),
-      body: ListView(
-        padding: EdgeInsets.all(16),
-        children: () {
-          List<Widget> list = List.empty(growable: true);
-          for (var i = 0; i < listItems.length; i++) {
-            list.add(
-              ListTile(
-                title: GestureDetector(
-                  onTap: () => _showListItemBottomSheet(i),
-                  child: Text(listItems[i].listItem.name),
-                ),
-                leading: SizedBox.square(
-                  dimension: 16,
-                  child: () {
-                    if (listItems[i].state == ListItemState.loading) {
-                      return CircularProgressIndicator();
-                    }
+      body: RefreshIndicator(
+        onRefresh: () {
+          return initStateAsync(context);
+        },
+        child: ListView(
+          padding: EdgeInsets.all(16),
+          children: () {
+            List<Widget> list = List.empty(growable: true);
+            for (var i = 0; i < listItems.length; i++) {
+              list.add(
+                ListTile(
+                  title: GestureDetector(
+                    onTap: () => _showListItemBottomSheet(i),
+                    child: Text(listItems[i].listItem.name),
+                  ),
+                  leading: SizedBox.square(
+                    dimension: 16,
+                    child: () {
+                      if (listItems[i].state == ListItemState.loading) {
+                        return CircularProgressIndicator();
+                      }
 
-                    return Checkbox(
-                      value: listItems[i].state == ListItemState.checked,
-                      onChanged: (checked) async {
-                        setState(() {
-                          listItems[i].state = ListItemState.loading;
-                          initStateAsync(context);
-                        });
+                      return Checkbox(
+                        value: listItems[i].state == ListItemState.checked,
+                        onChanged: (checked) async {
+                          setState(() {
+                            listItems[i].state = ListItemState.loading;
+                            initStateAsync(context);
+                          });
 
-                        await openTonicAPI.updateListItem(
-                          widget.listId,
-                          listItems[i].listItem.id,
-                          checked == true,
-                        );
+                          await openTonicAPI.updateListItem(
+                            widget.listId,
+                            listItems[i].listItem.id,
+                            checked == true,
+                          );
 
-                        setState(() {
-                          listItems[i].state = checked == true
-                              ? ListItemState.checked
-                              : ListItemState.unchecked;
-                        });
-                      },
-                    );
-                  }(),
+                          setState(() {
+                            listItems[i].state = checked == true
+                                ? ListItemState.checked
+                                : ListItemState.unchecked;
+                          });
+                        },
+                      );
+                    }(),
+                  ),
+                  trailing: SizedBox.square(
+                    dimension: 32,
+                    child:
+                        categories[listItems[i].listItem.categoryId - 1].icon,
+                  ),
                 ),
-                trailing: SizedBox.square(
-                  dimension: 32,
-                  child: categories[listItems[i].listItem.categoryId - 1].icon,
-                ),
-              ),
-            );
-          }
-          return list;
-        }(),
+              );
+            }
+            return list;
+          }(),
+        ),
       ),
     );
   }
