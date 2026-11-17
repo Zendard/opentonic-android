@@ -373,7 +373,7 @@ class OpenTonicAPI {
       return response.body;
     } else {
       throw Exception(
-        "Failed to get icon: ${response.statusCode}, ${response.body}",
+        "Failed to get icon: ${response.statusCode}, ${response.body}, $iconId,${response.request!.url}",
       );
     }
   }
