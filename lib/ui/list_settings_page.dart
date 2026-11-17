@@ -71,6 +71,11 @@ class _ListSettingsPageState extends State<ListSettingsPage>
   }
 
   @override
+  Future<void> onErrorRefresh() async {
+    return setList(widget.listId);
+  }
+
+  @override
   Widget buildReady(BuildContext context) {
     return Scaffold(
       appBar: AppBar(

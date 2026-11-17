@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
@@ -55,26 +56,37 @@ class _HomePageState extends State<HomePage> with OpenTonicPageState {
 
   @override
   AppBar buildAppBar(BuildContext context) {
-    return AppBar(
-      title: const Text("OpenTonic"),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.settings),
-          onPressed: () async {
-            final changed =
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsPage()),
-                ) ??
-                false;
+    if (!kIsWeb) {
+      return AppBar(
+        title: const Text("OpenTonic"),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings),
+            onPressed: () async {
+              final changed =
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsPage(),
+                    ),
+                  ) ??
+                  false;
 
-            if (changed) {
-              refreshLists();
-            }
-          },
-        ),
-      ],
-    );
+              if (changed) {
+                refreshLists();
+              }
+            },
+          ),
+        ],
+      );
+    } else {
+      return AppBar(title: Text("OpenTonic"));
+    }
+  }
+
+  @override
+  Future<void> onErrorRefresh() async {
+    return refreshLists();
   }
 
   @override

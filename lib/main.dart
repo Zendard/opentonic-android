@@ -1,9 +1,19 @@
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ui/home_page.dart';
 
 void main() {
+  if (kIsWeb) {
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setString("server-url", "https://localhost/{url_pfx}");
+      prefs.setString("username", "{username}");
+      prefs.setString("password", "");
+    }();
+  }
   runApp(const MainApp());
 }
 
@@ -45,6 +55,8 @@ mixin OpenTonicPageState {
     return AppBar();
   }
 
+  Future<void> onErrorRefresh() async {}
+
   Widget build(BuildContext context) {
     if (pageState.isLoading()) {
       return Scaffold(
@@ -54,18 +66,27 @@ mixin OpenTonicPageState {
     } else if (pageState.isError()) {
       return Scaffold(
         appBar: buildAppBar(context),
-        body: Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error, size: 32),
-              Text("An error has occurred:", style: TextStyle(fontSize: 32)),
-              Container(
-                padding: EdgeInsets.all(32),
-                child: Text("${pageState.getError()}"),
+        body: RefreshIndicator(
+          onRefresh: onErrorRefresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Center(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error, size: 32),
+                  Text(
+                    "An error has occurred:",
+                    style: TextStyle(fontSize: 32),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(32),
+                    child: Text("${pageState.getError()}"),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );

@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
@@ -82,7 +84,7 @@ class CategoryUI {
 class _ListPageState extends State<ListPage> with OpenTonicPageState {
   late OpenTonicList list;
   late List<ListItemUI> listItems;
-  late List<CategoryUI> categories;
+  late HashMap<int, CategoryUI> categories;
   late OpenTonicAPI openTonicAPI;
   late String? user;
 
@@ -112,19 +114,15 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     }
 
     final localCategories = await openTonicAPI.getCategories(widget.listId);
-    categories = List.empty(growable: true);
+    categories = HashMap();
 
     for (var category in localCategories) {
-      categories.add(
-        await CategoryUI.fromCategory(
-          category,
-          colorScheme.primary,
-          openTonicAPI,
-        ),
+      categories[category.id] = await CategoryUI.fromCategory(
+        category,
+        colorScheme.primary,
+        openTonicAPI,
       );
     }
-
-    categories.sort((a, b) => a.category.id - b.category.id);
 
     setState(() {
       pageState = PageState.ready();
@@ -168,7 +166,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                     dimension: 48,
                     child: IconButton.filledTonal(
                       icon: Center(
-                        child: categories[listItem.categoryId - 1].icon,
+                        child: categories[listItem.categoryId]!.icon,
                       ),
                       onPressed: () =>
                           _showChangeCategoryDialog(listItemIndex, context),
@@ -222,7 +220,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
       context: context,
       builder: (context) => SimpleDialog(
         title: Text("Choose a category"),
-        children: categories
+        children: categories.values
             .map(
               (categoryUI) => SimpleDialogOption(
                 onPressed: () async {
@@ -273,6 +271,11 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
             .toList(),
       ),
     );
+  }
+
+  @override
+  Future<void> onErrorRefresh() async {
+    return initStateAsync(context);
   }
 
   @override
@@ -371,8 +374,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   ),
                   trailing: SizedBox.square(
                     dimension: 32,
-                    child:
-                        categories[listItems[i].listItem.categoryId - 1].icon,
+                    child: categories[listItems[i].listItem.categoryId]!.icon,
                   ),
                 ),
               );
