@@ -294,6 +294,28 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     );
   }
 
+  Future<void> _checkListItem(int listItemIndex) async {
+    final listItemUI = listItems![listItemIndex];
+    setState(() {
+      listItemUI.state = ListItemState.loading;
+    });
+
+    await openTonicAPI.updateListItem(
+      widget.listId,
+      listItemUI.listItem.id,
+      !listItemUI.listItem.checked,
+    );
+
+    setState(() {
+      listItemUI.state = !listItemUI.listItem.checked
+          ? ListItemState.checked
+          : ListItemState.unchecked;
+
+      listItems!.removeAt(listItemIndex);
+      listItems!.add(listItemUI);
+    });
+  }
+
   @override
   Future<void> onErrorRefresh() async {
     return initStateAsync(context);
@@ -380,53 +402,75 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
             List<Widget> list = List.empty(growable: true);
             for (var i = 0; i < listItems!.length; i++) {
               list.add(
-                ListTile(
-                  title: GestureDetector(
-                    onTap: () => _showListItemBottomSheet(i),
-                    child: Text(listItems![i].listItem.name),
+                Dismissible(
+                  key: ValueKey(listItems![i].listItem.id),
+                  background: Container(
+                    color: Colors.green,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 16),
+                    child: const Icon(Icons.check, color: Colors.white),
                   ),
-                  leading: SizedBox.square(
-                    dimension: 16,
-                    child: () {
-                      if (listItems![i].state == ListItemState.loading) {
-                        return CircularProgressIndicator();
-                      }
-
-                      return Checkbox(
-                        value: listItems![i].state == ListItemState.checked,
-                        onChanged: (checked) async {
-                          setState(() {
-                            listItems![i].state = ListItemState.loading;
-                            initStateAsync(context);
-                          });
-
-                          await openTonicAPI.updateListItem(
-                            widget.listId,
-                            listItems![i].listItem.id,
-                            checked == true,
-                          );
-
-                          setState(() {
-                            listItems![i].state = checked == true
-                                ? ListItemState.checked
-                                : ListItemState.unchecked;
-                          });
-                        },
-                      );
-                    }(),
+                  secondaryBackground: Container(
+                    color: Theme.of(context).colorScheme.error,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Icon(
+                      Icons.delete,
+                      color: Theme.of(context).colorScheme.onError,
+                    ),
                   ),
-                  trailing: SizedBox.square(
-                    dimension: 32,
-                    child: () {
-                      if (categories == null || listItems == null) {
-                        return SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(),
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.startToEnd) {
+                      // Check item
+                      await _checkListItem(i);
+                      return false;
+                    }
+                    return true;
+                  },
+                  onDismissed: (direction) async {
+                    final listItemUI = listItems![i];
+                    setState(() {
+                      listItems!.removeAt(i);
+                    });
+
+                    await openTonicAPI.deleteListItem(
+                      widget.listId,
+                      listItemUI.listItem.id,
+                    );
+                  },
+                  child: ListTile(
+                    title: GestureDetector(
+                      onTap: () => _showListItemBottomSheet(i),
+                      child: Text(listItems![i].listItem.name),
+                    ),
+                    leading: SizedBox.square(
+                      dimension: 16,
+                      child: () {
+                        if (listItems![i].state == ListItemState.loading) {
+                          return CircularProgressIndicator();
+                        }
+
+                        return Checkbox(
+                          value: listItems![i].state == ListItemState.checked,
+                          onChanged: (_) async {
+                            _checkListItem(i);
+                          },
                         );
-                      }
-                      return categories![listItems![i].listItem.categoryId]!
-                          .icon;
-                    }(),
+                      }(),
+                    ),
+                    trailing: SizedBox.square(
+                      dimension: 32,
+                      child: () {
+                        if (categories == null || listItems == null) {
+                          return SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        return categories![listItems![i].listItem.categoryId]!
+                            .icon;
+                      }(),
+                    ),
                   ),
                 ),
               );
