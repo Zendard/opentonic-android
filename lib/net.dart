@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -364,17 +365,16 @@ class OpenTonicAPI {
   }
 
   Future<String> getIcon(String iconId) async {
-    final response = await http.get(
-      Uri.parse("$_serverUrl/static/icons/$iconId"),
-      headers: {HttpHeaders.authorizationHeader: "Basic $_authToken"},
-    );
-
-    if (response.statusCode == 200) {
-      return response.body;
-    } else {
-      throw Exception(
-        "Failed to get icon: ${response.statusCode}, ${response.body}, $iconId,${response.request!.url}",
+    final url = "$_serverUrl/static/icons/$iconId";
+    final headers = {HttpHeaders.authorizationHeader: "Basic $_authToken"};
+    try {
+      final file = await DefaultCacheManager().getSingleFile(
+        url,
+        headers: headers,
       );
+      return await file.readAsString();
+    } catch (e) {
+      throw Exception("Failed to get icon: $e, $iconId,$url");
     }
   }
 }
