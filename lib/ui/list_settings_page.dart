@@ -23,14 +23,17 @@ class _ListSettingsPageState extends State<ListSettingsPage>
   @override
   void initState() {
     super.initState();
-    () async {
-      try {
-        openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
-        setList(widget.listId);
-      } catch (e) {
-        pageState = PageState.error(e);
-      }
-    }();
+    initStateAsync(context);
+  }
+
+  void initStateAsync(BuildContext context) async {
+    super.initState();
+    try {
+      openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
+      setList(widget.listId);
+    } catch (e) {
+      pageState = PageState.error(e);
+    }
   }
 
   void setList(int listId) async {

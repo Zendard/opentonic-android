@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:opentonic/main.dart';
 import 'package:opentonic/net.dart';
 import 'package:opentonic/ui/add_list_item_page.dart';
+import 'package:opentonic/ui/list_categories_page.dart';
 import 'package:opentonic/ui/list_settings_page.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -286,6 +287,25 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
         actions: () {
           if (list.owner != user) return null;
           return [
+            IconButton(
+              onPressed: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ListCategoriesPage(listId: widget.listId),
+                  ),
+                );
+
+                if (!result) return;
+
+                setState(() {
+                  pageState = PageState.loading();
+                });
+                setState(() async {
+                  initStateAsync(context);
+                });
+              },
+              icon: Icon(Icons.format_list_numbered),
+            ),
             IconButton(
               onPressed: () async {
                 final result = await Navigator.of(context).push(
