@@ -22,15 +22,23 @@ class _HomePageState extends State<HomePage> with OpenTonicPageState {
   void initState() {
     super.initState();
     () async {
-      openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
       try {
-        lists = await openTonicAPI.getLists();
+        openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
+        try {
+          lists = await openTonicAPI.getLists();
+          setState(() {
+            pageState = PageState.ready();
+          });
+        } catch (e) {
+          setState(() {
+            pageState = PageState.error(e);
+          });
+        }
+      } catch (_) {
         setState(() {
-          pageState = PageState.ready();
-        });
-      } catch (e) {
-        setState(() {
-          pageState = PageState.error(e);
+          pageState = PageState.error(
+            "Please set a server url in the settings",
+          );
         });
       }
     }();
