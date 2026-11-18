@@ -84,8 +84,8 @@ class CategoryUI {
 
 class _ListPageState extends State<ListPage> with OpenTonicPageState {
   late OpenTonicList list;
-  late List<ListItemUI> listItems;
-  late HashMap<int, CategoryUI> categories;
+  List<ListItemUI>? listItems;
+  HashMap<int, CategoryUI>? categories;
   late OpenTonicAPI openTonicAPI;
   late String? user;
 
@@ -105,20 +105,30 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
 
     list = await openTonicAPI.getList(widget.listId);
+
+    setState(() {
+      pageState = PageState.ready();
+    });
+
     final localListItems = await openTonicAPI.getListItems(widget.listId);
     listItems = List.empty(growable: true);
     if (!context.mounted) return;
     final colorScheme = ColorScheme.of(context);
 
     for (var listItem in localListItems) {
-      listItems.add(await ListItemUI.fromListItem(widget.listId, listItem));
+      final listItemUI = await ListItemUI.fromListItem(widget.listId, listItem);
+      listItems!.add(listItemUI);
     }
+
+    setState(() {
+      listItems;
+    });
 
     final localCategories = await openTonicAPI.getCategories(widget.listId);
     categories = HashMap();
 
     for (var category in localCategories) {
-      categories[category.id] = await CategoryUI.fromCategory(
+      categories![category.id] = await CategoryUI.fromCategory(
         category,
         colorScheme.primary,
         openTonicAPI,
@@ -126,7 +136,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     }
 
     setState(() {
-      pageState = PageState.ready();
+      categories;
     });
   }
 
@@ -139,7 +149,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
   }
 
   void _showListItemBottomSheet(int listItemIndex) {
-    final listItem = listItems[listItemIndex].listItem;
+    final listItem = listItems![listItemIndex].listItem;
     showModalBottomSheet(
       context: context,
       builder: (context) => BottomSheet(
@@ -167,7 +177,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                     dimension: 48,
                     child: IconButton.filledTonal(
                       icon: Center(
-                        child: categories[listItem.categoryId]!.icon,
+                        child: categories![listItem.categoryId]!.icon,
                       ),
                       onPressed: () =>
                           _showChangeCategoryDialog(listItemIndex, context),
@@ -180,7 +190,8 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
               ),
               IconButton.filled(
                 icon: () {
-                  if (listItems[listItemIndex].state == ListItemState.loading) {
+                  if (listItems![listItemIndex].state ==
+                      ListItemState.loading) {
                     return CircularProgressIndicator();
                   }
                   return Icon(Icons.delete);
@@ -190,7 +201,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                 ),
                 onPressed: () async {
                   setState(() {
-                    listItems[listItemIndex].state = ListItemState.loading;
+                    listItems![listItemIndex].state = ListItemState.loading;
                   });
 
                   if (!context.mounted) return;
@@ -199,7 +210,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   await openTonicAPI.deleteListItem(widget.listId, listItem.id);
 
                   setState(() {
-                    listItems.removeAt(listItemIndex);
+                    listItems!.removeAt(listItemIndex);
                   });
                 },
               ),
@@ -214,14 +225,14 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
     int listItemIndex,
     BuildContext context,
   ) async {
-    final listItemUI = listItems[listItemIndex];
+    final listItemUI = listItems![listItemIndex];
 
     if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text("Choose a category"),
-        children: categories.values
+        children: categories!.values
             .map(
               (categoryUI) => SimpleDialogOption(
                 onPressed: () async {
@@ -230,7 +241,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   Navigator.of(context).pop();
 
                   setState(() {
-                    listItems[listItemIndex].state = ListItemState.loading;
+                    listItems![listItemIndex].state = ListItemState.loading;
                   });
 
                   await openTonicAPI.updateProduct(
@@ -251,7 +262,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   );
 
                   setState(() {
-                    listItems[listItemIndex] = localListItemUI;
+                    listItems![listItemIndex] = localListItemUI;
                   });
                 },
                 child: Row(
@@ -354,37 +365,40 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
         child: ListView(
           padding: EdgeInsets.all(16),
           children: () {
+            if (listItems == null) {
+              return [Center(child: CircularProgressIndicator())];
+            }
             List<Widget> list = List.empty(growable: true);
-            for (var i = 0; i < listItems.length; i++) {
+            for (var i = 0; i < listItems!.length; i++) {
               list.add(
                 ListTile(
                   title: GestureDetector(
                     onTap: () => _showListItemBottomSheet(i),
-                    child: Text(listItems[i].listItem.name),
+                    child: Text(listItems![i].listItem.name),
                   ),
                   leading: SizedBox.square(
                     dimension: 16,
                     child: () {
-                      if (listItems[i].state == ListItemState.loading) {
+                      if (listItems![i].state == ListItemState.loading) {
                         return CircularProgressIndicator();
                       }
 
                       return Checkbox(
-                        value: listItems[i].state == ListItemState.checked,
+                        value: listItems![i].state == ListItemState.checked,
                         onChanged: (checked) async {
                           setState(() {
-                            listItems[i].state = ListItemState.loading;
+                            listItems![i].state = ListItemState.loading;
                             initStateAsync(context);
                           });
 
                           await openTonicAPI.updateListItem(
                             widget.listId,
-                            listItems[i].listItem.id,
+                            listItems![i].listItem.id,
                             checked == true,
                           );
 
                           setState(() {
-                            listItems[i].state = checked == true
+                            listItems![i].state = checked == true
                                 ? ListItemState.checked
                                 : ListItemState.unchecked;
                           });
@@ -394,7 +408,16 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   ),
                   trailing: SizedBox.square(
                     dimension: 32,
-                    child: categories[listItems[i].listItem.categoryId]!.icon,
+                    child: () {
+                      if (categories == null) {
+                        return SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+                      return categories![listItems![i].listItem.categoryId]!
+                          .icon;
+                    }(),
                   ),
                 ),
               );
