@@ -280,7 +280,37 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                     SizedBox.square(
                       dimension: 48,
                       child: IconButton.filledTonal(
-                        onPressed: () {},
+                        onPressed: () async {
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop();
+                          Navigator.of(context).pop();
+
+                          setState(() {
+                            listItems![listItemIndex].state =
+                                ListItemState.loading;
+                          });
+
+                          await openTonicAPI.updateProduct(
+                            widget.listId,
+                            listItemUI.listItem.productId,
+                            null,
+                            categoryUI.category.id,
+                          );
+
+                          final listItem = await openTonicAPI.getListItem(
+                            widget.listId,
+                            listItemUI.listItem.id,
+                          );
+
+                          final localListItemUI = await ListItemUI.fromListItem(
+                            widget.listId,
+                            listItem,
+                          );
+
+                          setState(() {
+                            listItems![listItemIndex] = localListItemUI;
+                          });
+                        },
                         icon: categoryUI.icon,
                       ),
                     ),
