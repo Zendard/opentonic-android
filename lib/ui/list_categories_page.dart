@@ -27,10 +27,6 @@ class _ListCategoriesPageState extends State<ListCategoriesPage>
     try {
       openTonicAPI = await OpenTonicAPI.fromSharedPrefs();
       categories = await openTonicAPI.getCategories(widget.listId);
-      categories.sort(
-        (categoryA, categoryB) =>
-            categoryA.orderIndex.compareTo(categoryB.orderIndex),
-      );
       setState(() {
         pageState = PageState.ready();
       });
@@ -47,6 +43,15 @@ class _ListCategoriesPageState extends State<ListCategoriesPage>
       categoryName,
       categoryIcon == "" ? null : categoryIcon,
     );
+    changed = true;
+  }
+
+  Future<void> deleteCategory(int categoryId) async {
+    openTonicAPI.deleteCategory(widget.listId, categoryId);
+    setState(() {
+      categories.removeWhere((category) => category.id == categoryId);
+    });
+    changed = true;
   }
 
   void showAddCategoryDialog(BuildContext context) async {
@@ -113,6 +118,44 @@ class _ListCategoriesPageState extends State<ListCategoriesPage>
     );
   }
 
+  void reorderCategories(int categoryOldIndex, int categoryNewIndex) {
+    final movedCategory = categories[categoryOldIndex];
+
+    setState(() {
+      categories.removeAt(categoryOldIndex);
+      categories.insert(categoryNewIndex, movedCategory);
+    });
+
+    if (categoryNewIndex == categories.length - 1) {
+      openTonicAPI.updateCategory(
+        widget.listId,
+        movedCategory.id,
+        null,
+        null,
+        categories
+                .lastWhere((category) => category.id != movedCategory.id)
+                .orderIndex +
+            1,
+      );
+      changed = true;
+      return;
+    }
+
+    final nextCategory = categories[categoryNewIndex + 1];
+
+    for (var index = categoryNewIndex; index < categories.length; index++) {
+      final category = categories[index];
+      openTonicAPI.updateCategory(
+        widget.listId,
+        category.id,
+        null,
+        null,
+        nextCategory.orderIndex + index,
+      );
+    }
+    changed = true;
+  }
+
   @override
   Widget buildReady(BuildContext context) {
     return Scaffold(
@@ -124,44 +167,61 @@ class _ListCategoriesPageState extends State<ListCategoriesPage>
           },
         ),
       ),
-      body: ListView(
+      body: ReorderableListView.builder(
+        buildDefaultDragHandles: true,
+        onReorderItem: reorderCategories,
         padding: EdgeInsets.all(16),
-        children: [
-          ReorderableListView(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            onReorderItem: (oldIndex, newIndex) {},
-            children: categories
-                .map(
-                  (category) => ListTile(
-                    key: ValueKey(category.id),
-                    title: Text(category.name),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final category = categories[index];
+          return ListTile(
+            key: ValueKey(category.id),
+            title: Text(category.name),
+            leading: ReorderableDragStartListener(
+              index: index,
+              child: Icon(Icons.drag_indicator),
+            ),
+            trailing: IconButton.filled(
+              icon: Icon(Icons.delete),
+              style: IconButton.styleFrom(
+                backgroundColor: ColorScheme.of(context).error,
+                foregroundColor: ColorScheme.of(context).onError,
+              ),
+              onPressed: () async {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text("Are you sure"),
+                    content: Text(
+                      "Do you really want to delete this category?",
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await deleteCategory(category.id);
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop();
+                        },
+                        child: Text("Delete"),
+                      ),
+                    ],
                   ),
-                )
-                .toList(),
-          ),
-          TextButton.icon(
-            onPressed: () => showAddCategoryDialog(context),
-            icon: Icon(Icons.add),
-            label: Text("Add category"),
-          ),
-        ],
+                );
+              },
+            ),
+          );
+        },
       ),
-      floatingActionButton: () {
-        if (!edited) {
-          return null;
-        }
-
-        return FloatingActionButton(
-          child: Icon(Icons.save),
-          onPressed: () {
-            setState(() {
-              edited = false;
-              changed = true;
-            });
-          },
-        );
-      }(),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () => showAddCategoryDialog(context),
+      ),
     );
   }
 }

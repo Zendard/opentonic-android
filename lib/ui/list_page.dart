@@ -300,7 +300,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                 setState(() {
                   pageState = PageState.loading();
                 });
-                setState(() async {
+                setState(() {
                   initStateAsync(context);
                 });
               },
