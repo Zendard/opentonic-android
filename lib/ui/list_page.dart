@@ -110,34 +110,43 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
       pageState = PageState.ready();
     });
 
-    final localListItems = await openTonicAPI.getListItems(widget.listId);
-    listItems = List.empty(growable: true);
-    if (!context.mounted) return;
-    final colorScheme = ColorScheme.of(context);
+    () async {
+      final localListItems = await openTonicAPI.getListItems(widget.listId);
+      List<ListItemUI> listItemsUI = List.empty(growable: true);
+      if (!context.mounted) return;
 
-    for (var listItem in localListItems) {
-      final listItemUI = await ListItemUI.fromListItem(widget.listId, listItem);
-      listItems!.add(listItemUI);
-    }
+      for (var listItem in localListItems) {
+        final listItemUI = await ListItemUI.fromListItem(
+          widget.listId,
+          listItem,
+        );
+        listItemsUI.add(listItemUI);
+      }
+      listItems = listItemsUI;
+      setState(() {
+        listItems;
+      });
+    }();
 
-    setState(() {
-      listItems;
-    });
+    () async {
+      final localCategories = await openTonicAPI.getCategories(widget.listId);
+      HashMap<int, CategoryUI> categoriesUI = HashMap();
+      if (!context.mounted) return;
+      final colorScheme = ColorScheme.of(context);
 
-    final localCategories = await openTonicAPI.getCategories(widget.listId);
-    categories = HashMap();
+      for (var category in localCategories) {
+        categoriesUI[category.id] = await CategoryUI.fromCategory(
+          category,
+          colorScheme.primary,
+          openTonicAPI,
+        );
+      }
 
-    for (var category in localCategories) {
-      categories![category.id] = await CategoryUI.fromCategory(
-        category,
-        colorScheme.primary,
-        openTonicAPI,
-      );
-    }
-
-    setState(() {
-      categories;
-    });
+      categories = categoriesUI;
+      setState(() {
+        categories;
+      });
+    }();
   }
 
   String addedOnToString(DateTime addedOn) {
@@ -409,7 +418,7 @@ class _ListPageState extends State<ListPage> with OpenTonicPageState {
                   trailing: SizedBox.square(
                     dimension: 32,
                     child: () {
-                      if (categories == null) {
+                      if (categories == null || listItems == null) {
                         return SizedBox.square(
                           dimension: 16,
                           child: CircularProgressIndicator(),
